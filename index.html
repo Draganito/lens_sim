@@ -18,8 +18,62 @@
     <div class="container">
         <div class="controls">
             <h2>Parameters</h2>
-            <label>Lens Diameter (mm): <input type="number" id="lensDia" value="20" step="0.1"></label>
-            <label>Cone Diameter Film Plane (mm): 
+            <label>Focal Length (mm):
+                <select id="focalLength">
+                    <option value="75">75 mm</option>
+                    <option value="80" selected>80 mm</option>
+                    <option value="85">85 mm</option>
+                    <option value="100">100 mm</option>
+                    <option value="105">105 mm</option>
+                    <option value="120">120 mm</option>
+                    <option value="130">130 mm</option>
+                    <option value="135">135 mm</option>
+                    <option value="150">150 mm</option>
+                    <option value="165">165 mm</option>
+                    <option value="180">180 mm</option>
+                </select>
+            </label>
+            <label>Aperture (f/):
+                <select id="aperture">
+                    <option value="1">f/1 (International)</option>
+                    <option value="1.2">f/1.2 (International, half)</option>
+                    <option value="1.4">f/1.4 (International)</option>
+                    <option value="1.8">f/1.8 (International, half)</option>
+                    <option value="2">f/2 (International)</option>
+                    <option value="2.7">f/2.7 (German)</option>
+                    <option value="2.8" selected>f/2.8 (International)</option>
+                    <option value="3.2">f/3.2 (German, half)</option>
+                    <option value="3.5">f/3.5 (International/German, half)</option>
+                    <option value="4">f/4 (International)</option>
+                    <option value="4.5">f/4.5 (German, half)</option>
+                    <option value="4.8">f/4.8 (German)</option>
+                    <option value="5">f/5 (German, half)</option>
+                    <option value="5.6">f/5.6 (International)</option>
+                    <option value="6.3">f/6.3 (German, half)</option>
+                    <option value="6.8">f/6.8 (German)</option>
+                    <option value="7.2">f/7.2 (German)</option>
+                    <option value="8">f/8 (International)</option>
+                    <option value="9">f/9 (German, half)</option>
+                    <option value="9.5">f/9.5 (German)</option>
+                    <option value="11">f/11 (International)</option>
+                    <option value="12.5">f/12.5 (German, half)</option>
+                    <option value="16">f/16 (International)</option>
+                    <option value="18">f/18 (German, half)</option>
+                    <option value="22">f/22 (International)</option>
+                    <option value="25">f/25 (German, half)</option>
+                    <option value="32">f/32 (International)</option>
+                    <option value="36">f/36 (German, half)</option>
+                    <option value="45">f/45 (International)</option>
+                    <option value="50">f/50 (German, half)</option>
+                    <option value="64">f/64 (International)</option>
+                    <option value="68">f/68 (German)</option>
+                    <option value="71">f/71 (German, half)</option>
+                    <option value="88">f/88 (German)</option>
+                </select>
+            </label>
+            <label>Lens Diameter (mm): <input type="number" id="lensDiaInput" value="28.6" step="0.1" min="0.1"></label>
+            <label>Lens-Film Distance (mm): <input type="number" id="distLFInput" value="80" step="0.1" min="1"></label>
+            <label>Cone Diameter Film Plane (mm):
                 <select id="filmSize">
                     <option value="79.2">6x6 (56x56 mm, 79.2 mm Diagonal)</option>
                     <option value="89.6">6x7 (56x70 mm, 89.6 mm Diagonal)</option>
@@ -27,8 +81,7 @@
                     <option value="101.0" selected>6x9 (56x84 mm, 101.0 mm Diagonal)</option>
                 </select>
             </label>
-            <label>Lens-Film Distance (mm): <input type="number" id="distLF" value="60" step="1"></label>
-            <label>Flange/Film Plane Distance (mm): <input type="number" id="distOF" value="10" step="1" min="0.1" max="59.9"></label>
+            <label>Flange/Film Plane Distance (mm): <input type="number" id="distOF" value="30" step="1" min="0.1"></label>
             <label>Flange Inner Diameter (mm): <input type="number" id="apWidth" value="64" step="0.1"></label>
             <label><input type="checkbox" id="crossMode" checked> Crossed</label>
             <div class="info">
@@ -41,21 +94,34 @@
             <canvas id="canvas" width="600" height="500"></canvas>
         </div>
     </div>
-
     <script>
         let panX = 0, panY = 0, zoom = 1;
         let isDragging = false;
         let lastX, lastY;
-
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-
         // Echtzeit-Updates für Inputs
-        ['lensDia', 'filmSize', 'distLF', 'distOF', 'apWidth', 'crossMode'].forEach(id => {
-            document.getElementById(id).addEventListener('input', () => { draw(); updateInfo(); });
-            document.getElementById(id).addEventListener('change', () => { draw(); updateInfo(); });
+        ['focalLength', 'aperture', 'filmSize', 'distOF', 'apWidth', 'crossMode'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => { updateComputeds(); draw(); updateInfo(); });
+            document.getElementById(id).addEventListener('change', () => { updateComputeds(); draw(); updateInfo(); });
         });
-
+        document.getElementById('lensDiaInput').addEventListener('input', () => { draw(); updateInfo(); });
+        document.getElementById('lensDiaInput').addEventListener('change', () => { draw(); updateInfo(); });
+        document.getElementById('distLFInput').addEventListener('input', () => { updateDistOFMax(); draw(); updateInfo(); });
+        document.getElementById('distLFInput').addEventListener('change', () => { updateDistOFMax(); draw(); updateInfo(); });
+        function updateComputeds() {
+            const focal = parseFloat(document.getElementById('focalLength').value) || 80;
+            const aperture = parseFloat(document.getElementById('aperture').value) || 2.8;
+            const lensDia = focal / aperture;
+            document.getElementById('lensDiaInput').value = lensDia.toFixed(1);
+            document.getElementById('distLFInput').value = focal;
+            updateDistOFMax();
+        }
+        function updateDistOFMax() {
+            const focal = parseFloat(document.getElementById('focalLength').value) || 80;
+            const distLF = parseFloat(document.getElementById('distLFInput').value) || focal;
+            document.getElementById('distOF').max = distLF - 0.1;
+        }
         function updateInfo() {
             const effectiveDia = calculateEffectiveDia();
             document.getElementById('effectiveDia').textContent = effectiveDia.toFixed(1);
@@ -63,13 +129,14 @@
             const filmSize = parseFloat(document.getElementById('filmSize').value) || 78;
             vignetteEl.style.display = effectiveDia < filmSize ? 'inline' : 'none';
         }
-
         function calculateEffectiveDia() {
-            const distLF = parseFloat(document.getElementById('distLF').value) || 60;
+            const focal = parseFloat(document.getElementById('focalLength').value) || 80;
+            const aperture = parseFloat(document.getElementById('aperture').value) || 2.8;
+            const lensDia = parseFloat(document.getElementById('lensDiaInput').value) || (focal / aperture);
+            const distLF = parseFloat(document.getElementById('distLFInput').value) || focal;
             const distOF = Math.max(0.1, Math.min(parseFloat(document.getElementById('distOF').value) || 10, distLF - 0.1));
             const distOL = distLF - distOF;
             const r = distLF / distOL;
-            const lensDia = parseFloat(document.getElementById('lensDia').value) || 20;
             const apWidth = parseFloat(document.getElementById('apWidth').value) || 64;
             const crossMode = document.getElementById('crossMode').checked;
             const lensR = lensDia / 2;
@@ -82,7 +149,6 @@
             }
             return 2 * effectiveR;
         }
-
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             const rect = canvas.getBoundingClientRect();
@@ -97,13 +163,11 @@
             panY = mouseY - (mouseY - panY) * factor;
             draw();
         });
-
         canvas.addEventListener('mousedown', (e) => {
             isDragging = true;
             lastX = e.clientX;
             lastY = e.clientY;
         });
-
         canvas.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
             const deltaX = e.clientX - lastX;
@@ -114,22 +178,20 @@
             lastY = e.clientY;
             draw();
         });
-
         canvas.addEventListener('mouseup', () => { isDragging = false; });
         canvas.addEventListener('mouseleave', () => { isDragging = false; });
-
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+            const focal = parseFloat(document.getElementById('focalLength').value) || 80;
+            const aperture = parseFloat(document.getElementById('aperture').value) || 2.8;
+            const lensDia = parseFloat(document.getElementById('lensDiaInput').value) || (focal / aperture);
+            const distLF = parseFloat(document.getElementById('distLFInput').value) || focal;
             const centerX = canvas.width / 2;
-            const scale = 3; // Angepasst für größeres Canvas
-            const lensDia = parseFloat(document.getElementById('lensDia').value) || 20;
+            const scale = 3;
             const filmSize = parseFloat(document.getElementById('filmSize').value) || 78;
-            const distLF = parseFloat(document.getElementById('distLF').value) || 60;
             const distOF = Math.max(0.1, Math.min(parseFloat(document.getElementById('distOF').value) || 10, distLF - 0.1));
             const apWidth = parseFloat(document.getElementById('apWidth').value) || 64;
             const crossMode = document.getElementById('crossMode').checked;
-
             const distOL = distLF - distOF;
             const r = distLF / distOL;
             const lensR = lensDia / 2;
@@ -138,76 +200,65 @@
             const lensY = 100;
             const openY = lensY + distOL * scale;
             const filmY = lensY + distLF * scale;
-
             let effectiveR;
             if (crossMode) {
                 effectiveR = lensR * (r - 1) + apR * r;
             } else {
                 effectiveR = Math.abs(lensR + (apR - lensR) * r);
             }
-
             const lens_left_x = centerX - lensR * scale;
             const lens_right_x = centerX + lensR * scale;
             const film_left_x = centerX - effectiveR * scale;
             const film_right_x = centerX + effectiveR * scale;
-
             ctx.save();
             ctx.translate(panX, panY);
             ctx.scale(zoom, zoom);
-
-            // Linse (blau)
+            // Lens (blue)
             ctx.beginPath();
             ctx.moveTo(lens_left_x, lensY);
             ctx.lineTo(lens_right_x, lensY);
             ctx.strokeStyle = 'blue';
             ctx.lineWidth = 2 / zoom;
             ctx.stroke();
-
-            // Öffnung (rot, dick)
+            // Opening (red, thick)
             ctx.beginPath();
             ctx.moveTo(centerX - apR * scale, openY);
             ctx.lineTo(centerX + apR * scale, openY);
             ctx.strokeStyle = 'red';
             ctx.lineWidth = 3 / zoom;
             ctx.stroke();
-
-            // Film (grün)
+            // Film (green)
             ctx.beginPath();
             ctx.moveTo(centerX - filmR * scale, filmY);
             ctx.lineTo(centerX + filmR * scale, filmY);
             ctx.strokeStyle = 'green';
             ctx.lineWidth = 2 / zoom;
             ctx.stroke();
-
-            // Kegel-Linien (gerade, ohne Knick)
+            // Cone lines (straight, no kink)
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 1 / zoom;
-
             if (crossMode) {
-                // Kreuzend: Linse rechts -> Film links; Linse links -> Film rechts
+                // Crossed: lens right -> film left; lens left -> film right
                 ctx.beginPath();
                 ctx.moveTo(lens_right_x, lensY);
                 ctx.lineTo(film_left_x, filmY);
                 ctx.stroke();
-
                 ctx.beginPath();
                 ctx.moveTo(lens_left_x, lensY);
                 ctx.lineTo(film_right_x, filmY);
                 ctx.stroke();
             } else {
-                // Trapez: Linse links -> Film links; Linse rechts -> Film rechts
+                // Trapezoid: lens left -> film left; lens right -> film right
                 ctx.beginPath();
                 ctx.moveTo(lens_left_x, lensY);
                 ctx.lineTo(film_left_x, filmY);
                 ctx.stroke();
-
                 ctx.beginPath();
                 ctx.moveTo(lens_right_x, lensY);
                 ctx.lineTo(film_right_x, filmY);
                 ctx.stroke();
             }
-
-            // Effektiver Filmbereich (gestrichelt, wenn kleiner)
+            // Effective film area (dashed if smaller)
             ctx.setLineDash([5 / zoom, 5 / zoom]);
             ctx.beginPath();
             ctx.moveTo(film_left_x, filmY);
@@ -216,10 +267,9 @@
             ctx.lineWidth = 2 / zoom;
             ctx.stroke();
             ctx.setLineDash([]);
-
             ctx.restore();
         }
-
+        updateComputeds();
         draw();
         updateInfo();
     </script>
