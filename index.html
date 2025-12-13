@@ -77,10 +77,10 @@
             <label>Cone Diameter Film Plane (mm):
                 <select id="filmSize">
                     <option value="79.2">6x6 (56x56 mm, 79.2 mm Diagonal)</option>
-                    <option value="89.6">6x7 (56x70 mm, 89.6 mm Diagonal)</option>
-                    <option value="94.2">6x7 variation (57x75 mm, 94.2 mm Diagonal)</option>
-                    <option value="95.2">6x8 (56x77 mm, 95.2 mm Diagonal)</option>
+                    <option value="89.4">6x7 (56x69.5 mm, 89.4 mm Diagonal)</option>
+                    <option value="94.8">6x8 (56x76 mm, 94.8 mm Diagonal)</option>
                     <option value="101.0" selected>6x9 (56x84 mm, 101.0 mm Diagonal)</option>
+                    <option value="162.9">4x5 inch (102x127 mm, 162.9 mm Diagonal)</option>
                 </select>
             </label>
             <label>Flange/Film Plane Distance (mm): <input type="number" id="distOF" value="31" step="1" min="0.1"></label>
@@ -95,29 +95,24 @@
             <canvas id="canvas" width="800" height="600"></canvas>
         </div>
     </div>
-
     <script>
         let panX = 0, panY = 0, zoom = 1;
         let isDragging = false;
         let lastX, lastY;
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-
         ['focalLength', 'aperture', 'filmSize', 'distOF', 'apWidth', 'closeFocus'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('input', () => { updateComputeds(); draw(); updateInfo(); });
             el.addEventListener('change', () => { updateComputeds(); draw(); updateInfo(); });
         });
-
         document.getElementById('lensDiaInput').addEventListener('input', () => { draw(); updateInfo(); });
         document.getElementById('lensDiaInput').addEventListener('change', () => { draw(); updateInfo(); });
         document.getElementById('distLFInput').addEventListener('input', () => { updateDistOFMax(); draw(); updateInfo(); });
         document.getElementById('distLFInput').addEventListener('change', () => { updateDistOFMax(); draw(); updateInfo(); });
-
         function updateComputeds() {
             const focal = parseFloat(document.getElementById('focalLength').value) || 80;
             const aperture = parseFloat(document.getElementById('aperture').value) || 2.8;
-
             if (!document.getElementById('closeFocus').checked) {
                 document.getElementById('distLFInput').value = focal;
                 document.getElementById('distLFInput').disabled = false;
@@ -127,19 +122,15 @@
                 document.getElementById('distLFInput').value = newDistLF.toFixed(1);
                 document.getElementById('distLFInput').disabled = true;
             }
-
             const lensDia = focal / aperture;
             document.getElementById('lensDiaInput').value = lensDia.toFixed(1);
-
             updateDistOFMax();
             updateInfo();
         }
-
         function updateDistOFMax() {
             const distLF = parseFloat(document.getElementById('distLFInput').value) || 80;
             document.getElementById('distOF').max = distLF - 0.1;
         }
-
         function updateInfo() {
             const effectiveDia = calculateEffectiveDia();
             document.getElementById('effectiveDia').textContent = effectiveDia.toFixed(1);
@@ -147,7 +138,6 @@
             const filmSize = parseFloat(document.getElementById('filmSize').value) || 101;
             vignetteEl.style.display = effectiveDia < filmSize ? 'inline' : 'none';
         }
-
         function calculateEffectiveDia() {
             const focal = parseFloat(document.getElementById('focalLength').value) || 80;
             const aperture = parseFloat(document.getElementById('aperture').value) || 2.8;
@@ -162,7 +152,6 @@
             const effectiveR = lensR * (r - 1) + apR * r;
             return 2 * effectiveR;
         }
-
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             const rect = canvas.getBoundingClientRect();
@@ -177,13 +166,11 @@
             panY = mouseY - (mouseY - panY) * factor;
             draw();
         });
-
         canvas.addEventListener('mousedown', (e) => {
             isDragging = true;
             lastX = e.clientX;
             lastY = e.clientY;
         });
-
         canvas.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
             const deltaX = e.clientX - lastX;
@@ -194,13 +181,10 @@
             lastY = e.clientY;
             draw();
         });
-
         canvas.addEventListener('mouseup', () => { isDragging = false; });
         canvas.addEventListener('mouseleave', () => { isDragging = false; });
-
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
             const focal = parseFloat(document.getElementById('focalLength').value) || 80;
             const aperture = parseFloat(document.getElementById('aperture').value) || 2.8;
             const lensDia = parseFloat(document.getElementById('lensDiaInput').value) || (focal / aperture);
@@ -219,18 +203,14 @@
             const parallelY = lensY - 200;
             const openY = lensY + distOL * scale;
             const filmY = lensY + distLF * scale;
-
             const effectiveR = lensR * (r - 1) + apR * r;
-
             const lens_left_x = centerX - lensR * scale;
             const lens_right_x = centerX + lensR * scale;
             const film_left_x = centerX - effectiveR * scale;
             const film_right_x = centerX + effectiveR * scale;
-
             ctx.save();
             ctx.translate(panX, panY);
             ctx.scale(zoom, zoom);
-
             // Optische Achse
             ctx.strokeStyle = '#aaa';
             ctx.setLineDash([8 / zoom, 8 / zoom]);
@@ -239,7 +219,6 @@
             ctx.lineTo(canvas.width, lensY);
             ctx.stroke();
             ctx.setLineDash([]);
-
             // Linse Symbol
             ctx.strokeStyle = 'blue';
             ctx.lineWidth = 3 / zoom;
@@ -257,7 +236,6 @@
             ctx.lineTo(centerX, lensY);
             ctx.lineTo(centerX + 25, lensY + 60);
             ctx.stroke();
-
             // Flange (red)
             ctx.strokeStyle = 'red';
             ctx.lineWidth = 4 / zoom;
@@ -265,7 +243,6 @@
             ctx.moveTo(centerX - apR * scale, openY);
             ctx.lineTo(centerX + apR * scale, openY);
             ctx.stroke();
-
             // Brennebene
             ctx.strokeStyle = (2 * effectiveR < filmSize) ? 'orange' : 'green';
             ctx.lineWidth = 2 / zoom;
@@ -273,13 +250,11 @@
             ctx.moveTo(centerX - filmR * scale, filmY);
             ctx.lineTo(centerX + filmR * scale, filmY);
             ctx.stroke();
-
             // Brennpunkt
             ctx.fillStyle = 'black';
             ctx.beginPath();
             ctx.arc(centerX, filmY, 4 / zoom, 0, Math.PI * 2);
             ctx.fill();
-
             // Chief Ray
             ctx.strokeStyle = 'purple';
             ctx.lineWidth = 1.5 / zoom;
@@ -287,7 +262,6 @@
             ctx.moveTo(centerX, parallelY);
             ctx.lineTo(centerX, filmY);
             ctx.stroke();
-
             // Actual cone (crossed)
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 1.2 / zoom;
@@ -301,7 +275,6 @@
             ctx.lineTo(lens_left_x, lensY);
             ctx.lineTo(film_right_x, filmY);
             ctx.stroke();
-
             // Desired full cone when vignetting
             if (2 * effectiveR < filmSize) {
                 ctx.strokeStyle = 'gray';
@@ -317,10 +290,8 @@
                 ctx.stroke();
                 ctx.setLineDash([]);
             }
-
             ctx.restore();
         }
-
         updateComputeds();
         draw();
         updateInfo();
