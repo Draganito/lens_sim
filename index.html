@@ -79,7 +79,7 @@
                     <option value="79.2">6x6 (56x56 mm, 79.2 mm Diagonal)</option>
                     <option value="89.4">6x7 (56x69.5 mm, 89.4 mm Diagonal)</option>
                     <option value="94.8">6x8 (56x76 mm, 94.8 mm Diagonal)</option>
-                    <option value="101.0" selected>6x9 (56x84 mm, 101.0 mm Diagonal)</option>
+                    <option value="99.2" selected>6x9 (56x81.5 mm, 99.2 mm Diagonal)</option>
                     <option value="162.9">4x5 inch (102x127 mm, 162.9 mm Diagonal)</option>
                 </select>
             </label>
@@ -118,7 +118,7 @@
                 document.getElementById('distLFInput').disabled = false;
             } else {
                 const objectDist = 1000; // 1 m
-                const newDistLF = focal + focal * focal / (objectDist - focal); // genaue Formel für Erhöhung
+                const newDistLF = focal + focal * focal / (objectDist - focal);
                 document.getElementById('distLFInput').value = newDistLF.toFixed(1);
                 document.getElementById('distLFInput').disabled = true;
             }
@@ -135,7 +135,7 @@
             const effectiveDia = calculateEffectiveDia();
             document.getElementById('effectiveDia').textContent = effectiveDia.toFixed(1);
             const vignetteEl = document.getElementById('vignette');
-            const filmSize = parseFloat(document.getElementById('filmSize').value) || 101;
+            const filmSize = parseFloat(document.getElementById('filmSize').value) || 99.2;
             vignetteEl.style.display = effectiveDia < filmSize ? 'inline' : 'none';
         }
         function calculateEffectiveDia() {
@@ -191,7 +191,7 @@
             const distLF = parseFloat(document.getElementById('distLFInput').value) || focal;
             const centerX = canvas.width / 2;
             const scale = 3;
-            const filmSize = parseFloat(document.getElementById('filmSize').value) || 101;
+            const filmSize = parseFloat(document.getElementById('filmSize').value) || 99.2;
             const distOF = Math.max(0.1, Math.min(parseFloat(document.getElementById('distOF').value) || 30, distLF - 0.1));
             const apWidth = parseFloat(document.getElementById('apWidth').value) || 61;
             const distOL = distLF - distOF;
