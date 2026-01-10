@@ -22,10 +22,10 @@
                 <select id="focalLength">
                     <option value="70">70 mm</option>
                     <option value="75">75 mm</option>
-                    <option value="80" selected>80 mm</option>
+                    <option value="80">80 mm</option>
                     <option value="85">85 mm</option>
                     <option value="100">100 mm</option>
-                    <option value="105">105 mm</option>
+                    <option value="105" selected>105 mm</option>
                     <option value="110">110 mm</option>
                     <option value="115">115 mm</option>
                     <option value="120">120 mm</option>
@@ -44,7 +44,7 @@
                     <option value="1.8">f/1.8</option>
                     <option value="2">f/2</option>
                     <option value="2.7">f/2.7</option>
-                    <option value="2.8" selected>f/2.8</option>
+                    <option value="2.8">f/2.8</option>
                     <option value="3.2">f/3.2</option>
                     <option value="3.5">f/3.5</option>
                     <option value="4">f/4</option>
@@ -64,7 +64,7 @@
                     <option value="18">f/18</option>
                     <option value="22">f/22</option>
                     <option value="25">f/25</option>
-                    <option value="32">f/32</option>
+                    <option value="32" selected>f/32</option>
                     <option value="36">f/36</option>
                     <option value="45">f/45</option>
                     <option value="50">f/50</option>
@@ -76,7 +76,7 @@
             </label>
             <label>Lens Diameter (mm): <input type="number" id="lensDiaInput" value="28.6" step="0.1" min="0.1"></label>
             <label>Lens-Film Distance (mm): <input type="number" id="distLFInput" value="80" step="0.1" min="1"></label>
-            <label><input type="checkbox" id="closeFocus"> Closefocus (theoretical) (1.2 m)</label>
+            <label><input type="checkbox" id="closeFocus"> Closefocus (theoretical) (1.5 m)</label>
             <label>Cone Diameter Film Plane (mm):
                 <select id="filmSize">
                     <option value="79.2">6x6 (56x56 mm, 79.2 mm Diagonal)</option>
@@ -123,7 +123,7 @@
                 document.getElementById('distLFInput').value = focal;
                 document.getElementById('distLFInput').disabled = false;
             } else {
-                const objectDist = 1200; // 1.2 m
+                const objectDist = 1500; // 1.5 m
                 const newDistLF = focal + focal * focal / (objectDist - focal);
                 document.getElementById('distLFInput').value = newDistLF.toFixed(1);
                 document.getElementById('distLFInput').disabled = true;
