@@ -20,11 +20,14 @@
             <h2>Parameters</h2>
             <label>Focal Length (mm):
                 <select id="focalLength">
+                    <option value="70">70 mm</option>
                     <option value="75">75 mm</option>
                     <option value="80" selected>80 mm</option>
                     <option value="85">85 mm</option>
                     <option value="100">100 mm</option>
                     <option value="105">105 mm</option>
+                    <option value="110">110 mm</option>
+                    <option value="115">115 mm</option>
                     <option value="120">120 mm</option>
                     <option value="130">130 mm</option>
                     <option value="135">135 mm</option>
@@ -73,7 +76,7 @@
             </label>
             <label>Lens Diameter (mm): <input type="number" id="lensDiaInput" value="28.6" step="0.1" min="0.1"></label>
             <label>Lens-Film Distance (mm): <input type="number" id="distLFInput" value="80" step="0.1" min="1"></label>
-            <label><input type="checkbox" id="closeFocus"> Closefocus (theoretical) (1 m)</label>
+            <label><input type="checkbox" id="closeFocus"> Closefocus (theoretical) (1.2 m)</label>
             <label>Cone Diameter Film Plane (mm):
                 <select id="filmSize">
                     <option value="79.2">6x6 (56x56 mm, 79.2 mm Diagonal)</option>
@@ -83,11 +86,14 @@
                     <option value="162.9">4x5 inch (102x127 mm, 162.9 mm Diagonal)</option>
                 </select>
             </label>
-            <label>Flange/Film Plane Distance (mm): <input type="number" id="distOF" value="37" step="1" min="0.1"></label>
-            <label>Flange Inner Diameter (mm): <input type="number" id="apWidth" value="60" step="0.1"></label>
+            <label>Helicoid/Film Plane Distance (mm): <input type="number" id="distOF" value="41.5" step="1" min="0.1"></label>
+            <label>Helicoid Inner Diameter (mm): <input type="number" id="apWidth" value="61.5" step="0.1"></label>
+            <label>Flange Hole/Film Plane Distance (mm): <input type="number" id="distSecondOF" value="39" step="1" min="0.1"></label>
+            <label>Flange Hole Inner Diameter (mm): <input type="number" id="secondApWidth" value="64" step="0.1"></label>
             <div class="info">
                 <strong>Effective Diameter:</strong> <span id="effectiveDia">0</span> mm<br>
                 <span id="vignette" style="color: red; display: none;">Vignetting!</span>
+                <br><span id="vignetteCause" style="display: none;"></span>
             </div>
         </div>
         <div class="canvas-container">
@@ -101,7 +107,7 @@
         let lastX, lastY;
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        ['focalLength', 'aperture', 'filmSize', 'distOF', 'apWidth', 'closeFocus'].forEach(id => {
+        ['focalLength', 'aperture', 'filmSize', 'distOF', 'apWidth', 'closeFocus', 'distSecondOF', 'secondApWidth'].forEach(id => {
             const el = document.getElementById(id);
             el.addEventListener('input', () => { updateComputeds(); draw(); updateInfo(); });
             el.addEventListener('change', () => { updateComputeds(); draw(); updateInfo(); });
@@ -117,7 +123,7 @@
                 document.getElementById('distLFInput').value = focal;
                 document.getElementById('distLFInput').disabled = false;
             } else {
-                const objectDist = 1000; // 1 m
+                const objectDist = 1200; // 1.2 m
                 const newDistLF = focal + focal * focal / (objectDist - focal);
                 document.getElementById('distLFInput').value = newDistLF.toFixed(1);
                 document.getElementById('distLFInput').disabled = true;
@@ -130,27 +136,55 @@
         function updateDistOFMax() {
             const distLF = parseFloat(document.getElementById('distLFInput').value) || 80;
             document.getElementById('distOF').max = distLF - 0.1;
+            document.getElementById('distSecondOF').max = parseFloat(document.getElementById('distOF').value) - 0.1;
         }
         function updateInfo() {
-            const effectiveDia = calculateEffectiveDia();
+            const { effectiveDia, effectiveDia1, effectiveDia2 } = calculateEffectiveDias();
             document.getElementById('effectiveDia').textContent = effectiveDia.toFixed(1);
             const vignetteEl = document.getElementById('vignette');
+            const vignetteCauseEl = document.getElementById('vignetteCause');
             const filmSize = parseFloat(document.getElementById('filmSize').value) || 99.2;
-            vignetteEl.style.display = effectiveDia < filmSize ? 'inline' : 'none';
+            const isVignetting = effectiveDia < filmSize;
+            vignetteEl.style.display = isVignetting ? 'inline' : 'none';
+            vignetteCauseEl.style.display = isVignetting ? 'inline' : 'none';
+            if (isVignetting) {
+                let cause = '';
+                if (effectiveDia1 < effectiveDia2) {
+                    cause = 'Caused by: Helicoid (first obstacle)';
+                } else if (effectiveDia2 < effectiveDia1) {
+                    cause = 'Caused by: Flange Hole obstacle';
+                } else {
+                    cause = 'Caused by: Both obstacles';
+                }
+                vignetteCauseEl.textContent = cause;
+                vignetteCauseEl.style.color = 'red';
+            }
         }
-        function calculateEffectiveDia() {
+        function calculateEffectiveDias() {
             const focal = parseFloat(document.getElementById('focalLength').value) || 80;
             const aperture = parseFloat(document.getElementById('aperture').value) || 2.8;
             const lensDia = parseFloat(document.getElementById('lensDiaInput').value) || (focal / aperture);
             const distLF = parseFloat(document.getElementById('distLFInput').value) || focal;
             const distOF = Math.max(0.1, Math.min(parseFloat(document.getElementById('distOF').value) || 30, distLF - 0.1));
             const distOL = distLF - distOF;
-            const r = distLF / distOL;
+            const r1 = distLF / distOL;
             const apWidth = parseFloat(document.getElementById('apWidth').value) || 61;
             const lensR = lensDia / 2;
             const apR = apWidth / 2;
-            const effectiveR = lensR * (r - 1) + apR * r;
-            return 2 * effectiveR;
+            const effectiveR1 = lensR * (r1 - 1) + apR * r1;
+            const effectiveDia1 = 2 * effectiveR1;
+
+            // Second obstacle
+            const distSecondOF = Math.max(0.1, Math.min(parseFloat(document.getElementById('distSecondOF').value) || 20, distOF - 0.1));
+            const distSecondOL = distLF - distSecondOF;
+            const r2 = distLF / distSecondOL;
+            const secondApWidth = parseFloat(document.getElementById('secondApWidth').value) || 64;
+            const secondApR = secondApWidth / 2;
+            const effectiveR2 = lensR * (r2 - 1) + secondApR * r2;
+            const effectiveDia2 = 2 * effectiveR2;
+
+            const effectiveDia = Math.min(effectiveDia1, effectiveDia2);
+            return { effectiveDia, effectiveDia1, effectiveDia2 };
         }
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
@@ -195,7 +229,7 @@
             const distOF = Math.max(0.1, Math.min(parseFloat(document.getElementById('distOF').value) || 30, distLF - 0.1));
             const apWidth = parseFloat(document.getElementById('apWidth').value) || 61;
             const distOL = distLF - distOF;
-            const r = distLF / distOL;
+            const r1 = distLF / distOL;
             const lensR = lensDia / 2;
             const apR = apWidth / 2;
             const filmR = filmSize / 2;
@@ -203,11 +237,21 @@
             const parallelY = lensY - 200;
             const openY = lensY + distOL * scale;
             const filmY = lensY + distLF * scale;
-            const effectiveR = lensR * (r - 1) + apR * r;
-            const lens_left_x = centerX - lensR * scale;
-            const lens_right_x = centerX + lensR * scale;
+            const effectiveR1 = lensR * (r1 - 1) + apR * r1;
+
+            // Second obstacle
+            const distSecondOF = Math.max(0.1, Math.min(parseFloat(document.getElementById('distSecondOF').value) || 20, distOF - 0.1));
+            const secondOpenY = lensY + (distLF - distSecondOF) * scale;
+            const distSecondOL = distLF - distSecondOF;
+            const r2 = distLF / distSecondOL;
+            const secondApWidth = parseFloat(document.getElementById('secondApWidth').value) || 64;
+            const secondApR = secondApWidth / 2;
+            const effectiveR2 = lensR * (r2 - 1) + secondApR * r2;
+
+            const effectiveR = Math.min(effectiveR1, effectiveR2);
             const film_left_x = centerX - effectiveR * scale;
             const film_right_x = centerX + effectiveR * scale;
+
             ctx.save();
             ctx.translate(panX, panY);
             ctx.scale(zoom, zoom);
@@ -243,6 +287,13 @@
             ctx.moveTo(centerX - apR * scale, openY);
             ctx.lineTo(centerX + apR * scale, openY);
             ctx.stroke();
+            // Second obstacle (orange)
+            ctx.strokeStyle = 'orange';
+            ctx.lineWidth = 4 / zoom;
+            ctx.beginPath();
+            ctx.moveTo(centerX - secondApR * scale, secondOpenY);
+            ctx.lineTo(centerX + secondApR * scale, secondOpenY);
+            ctx.stroke();
             // Brennebene
             ctx.strokeStyle = (2 * effectiveR < filmSize) ? 'orange' : 'green';
             ctx.lineWidth = 2 / zoom;
@@ -266,13 +317,13 @@
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 1.2 / zoom;
             ctx.beginPath();
-            ctx.moveTo(lens_right_x, parallelY);
-            ctx.lineTo(lens_right_x, lensY);
+            ctx.moveTo(centerX + lensR * scale, parallelY);
+            ctx.lineTo(centerX + lensR * scale, lensY);
             ctx.lineTo(film_left_x, filmY);
             ctx.stroke();
             ctx.beginPath();
-            ctx.moveTo(lens_left_x, parallelY);
-            ctx.lineTo(lens_left_x, lensY);
+            ctx.moveTo(centerX - lensR * scale, parallelY);
+            ctx.lineTo(centerX - lensR * scale, lensY);
             ctx.lineTo(film_right_x, filmY);
             ctx.stroke();
             // Desired full cone when vignetting
@@ -281,11 +332,11 @@
                 ctx.lineWidth = 1.5 / zoom;
                 ctx.setLineDash([10 / zoom, 5 / zoom]);
                 ctx.beginPath();
-                ctx.moveTo(lens_right_x, lensY);
+                ctx.moveTo(centerX + lensR * scale, lensY);
                 ctx.lineTo(centerX - filmR * scale, filmY);
                 ctx.stroke();
                 ctx.beginPath();
-                ctx.moveTo(lens_left_x, lensY);
+                ctx.moveTo(centerX - lensR * scale, lensY);
                 ctx.lineTo(centerX + filmR * scale, filmY);
                 ctx.stroke();
                 ctx.setLineDash([]);
