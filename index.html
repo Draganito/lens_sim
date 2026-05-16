@@ -2,350 +2,356 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Lens Cone Visualization</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frankenstein Kamera Simulator - by Dragan Bojovic</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
-        .container { display: flex; gap: 20px; max-width: 1200px; margin: 0 auto; }
-        .controls { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .canvas-container { flex: 2; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
-        label { display: block; margin: 10px 0; font-weight: bold; }
-        input, select { width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; }
-        canvas { border: 1px solid #ddd; border-radius: 4px; }
-        .info { margin-top: 20px; padding: 10px; background: #e7f3ff; border-radius: 4px; font-size: 0.9em; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 10px; background-color: #f4f4f4; }
+        .container { display: flex; flex-direction: column; gap: 20px; max-width: 1200px; margin: 0 auto; }
+        
+        /* Desktop-Layout ab 768px Breite */
+        @media (min-width: 768px) {
+            body { padding: 20px; }
+            .container { flex-direction: row; }
+        }
+
+        .controls { flex: 1; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .canvas-container { flex: 2; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+        
+        label { display: block; margin: 12px 0 4px 0; font-weight: bold; font-size: 0.95em; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 16px; /* Verhindert Auto-Zoom bei iOS */ }
+        
+        canvas { background: #111; border: 1px solid #ddd; border-radius: 4px; width: 100%; height: auto; display: block; }
+        p { color: #666; font-size: 0.8em; margin: 8px 0; }
+        hr { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
+        
+        .status-box { margin-top: 15px; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 0.9em; line-height: 1.4; text-align: left; }
+        .status-ok { background-color: #e6f4ea; color: #137333; border: 1px solid #ceead6; }
+        .status-warn { background-color: #fce8e6; color: #c5221f; border: 1px solid #fad2cf; }
+        .value-display { font-weight: normal; color: #555; float: right; }
+        .credits { font-size: 0.85em; color: #888; font-style: italic; margin-top: -5px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="controls">
-            <h2>Parameters</h2>
-            <label>Focal Length (mm):
-                <select id="focalLength">
-                    <option value="70">70 mm</option>
-                    <option value="75">75 mm</option>
-                    <option value="80">80 mm</option>
-                    <option value="85">85 mm</option>
-                    <option value="100">100 mm</option>
-                    <option value="105" selected>105 mm</option>
-                    <option value="110">110 mm</option>
-                    <option value="115">115 mm</option>
-                    <option value="120">120 mm</option>
-                    <option value="130">130 mm</option>
-                    <option value="135">135 mm</option>
-                    <option value="150">150 mm</option>
-                    <option value="165">165 mm</option>
-                    <option value="180">180 mm</option>
-                </select>
-            </label>
-            <label>Aperture (f/):
-                <select id="aperture">
-                    <option value="1">f/1</option>
-                    <option value="1.2">f/1.2</option>
-                    <option value="1.4">f/1.4</option>
-                    <option value="1.8">f/1.8</option>
-                    <option value="2">f/2</option>
-                    <option value="2.7">f/2.7</option>
-                    <option value="2.8">f/2.8</option>
-                    <option value="3.2">f/3.2</option>
-                    <option value="3.5">f/3.5</option>
-                    <option value="4">f/4</option>
-                    <option value="4.5">f/4.5</option>
-                    <option value="4.8">f/4.8</option>
-                    <option value="5">f/5</option>
-                    <option value="5.6">f/5.6</option>
-                    <option value="6.3">f/6.3</option>
-                    <option value="6.8">f/6.8</option>
-                    <option value="7.2">f/7.2</option>
-                    <option value="8">f/8</option>
-                    <option value="9">f/9</option>
-                    <option value="9.5">f/9.5</option>
-                    <option value="11">f/11</option>
-                    <option value="12.5">f/12.5</option>
-                    <option value="16">f/16</option>
-                    <option value="18">f/18</option>
-                    <option value="22">f/22</option>
-                    <option value="25">f/25</option>
-                    <option value="32" selected>f/32</option>
-                    <option value="36">f/36</option>
-                    <option value="45">f/45</option>
-                    <option value="50">f/50</option>
-                    <option value="64">f/64</option>
-                    <option value="68">f/68</option>
-                    <option value="71">f/71</option>
-                    <option value="88">f/88</option>
-                </select>
-            </label>
-            <label>Lens Diameter (mm): <input type="number" id="lensDiaInput" value="28.6" step="0.1" min="0.1"></label>
-            <label>Lens-Film Distance (mm): <input type="number" id="distLFInput" value="80" step="0.1" min="1"></label>
-            <label><input type="checkbox" id="closeFocus"> Closefocus (theoretical) (1.5 m)</label>
-            <label>Cone Diameter Film Plane (mm):
-                <select id="filmSize">
-                    <option value="79.2">6x6 (56x56 mm, 79.2 mm Diagonal)</option>
-                    <option value="89.4">6x7 (56x69.5 mm, 89.4 mm Diagonal)</option>
-                    <option value="94.8">6x8 (56x76 mm, 94.8 mm Diagonal)</option>
-                    <option value="99.2" selected>6x9 (56x81.5 mm, 99.2 mm Diagonal)</option>
-                    <option value="162.9">4x5 inch (102x127 mm, 162.9 mm Diagonal)</option>
-                </select>
-            </label>
-            <label>Helicoid/Film Plane Distance (mm): <input type="number" id="distOF" value="41.5" step="1" min="0.1"></label>
-            <label>Helicoid Inner Diameter (mm): <input type="number" id="apWidth" value="61.5" step="0.1"></label>
-            <label>Flange Hole/Film Plane Distance (mm): <input type="number" id="distSecondOF" value="39" step="1" min="0.1"></label>
-            <label>Flange Hole Inner Diameter (mm): <input type="number" id="secondApWidth" value="64" step="0.1"></label>
-            <div class="info">
-                <strong>Effective Diameter:</strong> <span id="effectiveDia">0</span> mm<br>
-                <span id="vignette" style="color: red; display: none;">Vignetting!</span>
-                <br><span id="vignetteCause" style="display: none;"></span>
+        <div class="canvas-container">
+            <h2>Frankenstein Simulator</h2>
+            <canvas id="canvas" width="800" height="500"></canvas>
+            <p>Desktop: Wheel = Zoom, Drag = Pan | Mobile: Pinch/Swipe</p>
+
+            <div id="statusBox" class="status-box status-ok">
+                Optical Status: Calculating...
             </div>
         </div>
-        <div class="canvas-container">
-            <h2>Visualization</h2>
-            <canvas id="canvas" width="800" height="600"></canvas>
+
+        <div class="controls">
+            <h2>Controls</h2>
+            <div class="credits">Invented by Dragan Bojovic | Programmed by Gemini</div>
+            <p>Accurate separation of lens barrel housing and iris aperture</p>
+
+            <hr>
+
+            <label>Lens Focal Length: <span id="focalDisplay" class="value-display">105 mm</span></label>
+            <input type="range" id="lensFocal" min="10" max="300" step="1" value="105">
+
+            <label>Lens Maximum Aperture:</label>
+            <select id="maxAperture">
+                <option value="1">f/1</option>
+                <option value="1.2">f/1.2</option>
+                <option value="1.4">f/1.4</option>
+                <option value="1.8">f/1.8</option>
+                <option value="2">f/2</option>
+                <option value="2.7">f/2.7</option>
+                <option value="2.8">f/2.8</option>
+                <option value="3.2">f/3.2</option>
+                <option value="3.5">f/3.5</option>
+                <option value="4">f/4</option>
+                <option value="4.5" selected>f/4.5 (e.g., classic Tessar)</option>
+                <option value="4.8">f/4.8</option>
+                <option value="5">f/5</option>
+                <option value="5.6">f/5.6</option>
+                <option value="6.3">f/6.3</option>
+                <option value="6.8">f/6.8</option>
+                <option value="7.2">f/7.2</option>
+                <option value="8">f/8</option>
+                <option value="9">f/9 (e.g., classic Dagor)</option>
+            </select>
+
+            <label>Rear Lens Offset to FFD (mm): <span id="offsetDisplay" class="value-display">12 mm</span></label>
+            <input type="range" id="lensOffset" min="-20" max="40" step="0.5" value="12">
+
+            <hr>
+
+            <label>Working Aperture (Aperture f/):</label>
+            <select id="aperture"></select>
+            
+            <hr>
+            <label>Focus Distance: <span id="focusDistDisplay" class="value-display">Infinity</span></label>
+            <input type="range" id="focusDistance" min="0.5" max="10.0" step="0.1" value="10.0">
+
+            <hr>
+            
+            <label>Cone Diameter Film Plane (mm):</label>
+            <select id="filmSize">
+                <option value="79.2">6x6 (56x56 mm, 79.2 mm Diagonal)</option>
+                <option value="89.4">6x7 (56x69.5 mm, 89.4 mm Diagonal)</option>
+                <option value="94.8">6x8 (56x76 mm, 94.8 mm Diagonal)</option>
+                <option value="99.2" selected>6x9 (56x81.5 mm, 99.2 mm Diagonal)</option>
+                <option value="162.9">4x5 inch (102x127 mm, 162.9 mm Diagonal)</option>
+            </select>
+
+            <hr>
+            
+            <label>Helicoid Distance to Film (mm): </label>
+            <input type="number" id="distOF" value="41.5" step="0.5">
+            
+            <label>Helicoid Inner Diameter (mm): </label>
+            <input type="number" id="apWidth" value="61.0" step="0.5">
+
+            <hr>
+
+            <label>Flange Opening Distance to Film (mm): </label>
+            <input type="number" id="distSecondOF" value="39.0" step="0.5">
+            
+            <label>Flange Opening Inner Diameter (mm): </label>
+            <input type="number" id="secondApWidth" value="64.0" step="0.5">
         </div>
     </div>
+
     <script>
-        let panX = 0, panY = 0, zoom = 1;
-        let isDragging = false;
-        let lastX, lastY;
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        ['focalLength', 'aperture', 'filmSize', 'distOF', 'apWidth', 'closeFocus', 'distSecondOF', 'secondApWidth'].forEach(id => {
-            const el = document.getElementById(id);
-            el.addEventListener('input', () => { updateComputeds(); draw(); updateInfo(); });
-            el.addEventListener('change', () => { updateComputeds(); draw(); updateInfo(); });
-        });
-        document.getElementById('lensDiaInput').addEventListener('input', () => { draw(); updateInfo(); });
-        document.getElementById('lensDiaInput').addEventListener('change', () => { draw(); updateInfo(); });
-        document.getElementById('distLFInput').addEventListener('input', () => { updateDistOFMax(); draw(); updateInfo(); });
-        document.getElementById('distLFInput').addEventListener('change', () => { updateDistOFMax(); draw(); updateInfo(); });
-        function updateComputeds() {
-            const focal = parseFloat(document.getElementById('focalLength').value) || 80;
-            const aperture = parseFloat(document.getElementById('aperture').value) || 2.8;
-            if (!document.getElementById('closeFocus').checked) {
-                document.getElementById('distLFInput').value = focal;
-                document.getElementById('distLFInput').disabled = false;
-            } else {
-                const objectDist = 1500; // 1.5 m
-                const newDistLF = focal + focal * focal / (objectDist - focal);
-                document.getElementById('distLFInput').value = newDistLF.toFixed(1);
-                document.getElementById('distLFInput').disabled = true;
-            }
-            const lensDia = focal / aperture;
-            document.getElementById('lensDiaInput').value = lensDia.toFixed(1);
-            updateDistOFMax();
-            updateInfo();
+
+        let zoom = 2.2; 
+        let isDragging = false;
+        let lastX, lastY;
+
+        const filmX = 400; 
+        let panX = 0;
+        let panY = 0;
+
+        function resetCentering() {
+            const systemMidX = 340;
+            const systemMidY = 0;
+            panX = (canvas.width / 2) - (systemMidX * zoom);
+            panY = (canvas.height / 2) - (systemMidY * zoom);
         }
-        function updateDistOFMax() {
-            const distLF = parseFloat(document.getElementById('distLFInput').value) || 80;
-            document.getElementById('distOF').max = distLF - 0.1;
-            document.getElementById('distSecondOF').max = parseFloat(document.getElementById('distOF').value) - 0.1;
-        }
-        function updateInfo() {
-            const { effectiveDia, effectiveDia1, effectiveDia2 } = calculateEffectiveDias();
-            document.getElementById('effectiveDia').textContent = effectiveDia.toFixed(1);
-            const vignetteEl = document.getElementById('vignette');
-            const vignetteCauseEl = document.getElementById('vignetteCause');
-            const filmSize = parseFloat(document.getElementById('filmSize').value) || 99.2;
-            const isVignetting = effectiveDia < filmSize;
-            vignetteEl.style.display = isVignetting ? 'inline' : 'none';
-            vignetteCauseEl.style.display = isVignetting ? 'inline' : 'none';
-            if (isVignetting) {
-                let cause = '';
-                if (effectiveDia1 < effectiveDia2) {
-                    cause = 'Caused by: Helicoid (first obstacle)';
-                } else if (effectiveDia2 < effectiveDia1) {
-                    cause = 'Caused by: Flange Hole obstacle';
-                } else {
-                    cause = 'Caused by: Both obstacles';
+
+        const fullApertureList = [
+            1, 1.2, 1.4, 1.8, 2, 2.7, 2.8, 3.2, 3.5, 4, 4.5, 4.8, 5, 5.6, 
+            6.3, 6.8, 7.2, 8, 9, 9.5, 11, 12.5, 16, 18, 22, 25, 32, 36, 45, 50, 64, 68, 71, 88
+        ];
+
+        function updateWorkingApertureDropdown(forcePresetToMax = false) {
+            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
+            const apertureSelect = document.getElementById('aperture');
+            const previousValue = parseFloat(apertureSelect.value);
+            apertureSelect.innerHTML = ''; 
+
+            fullApertureList.forEach(val => {
+                if (val >= maxAperture) {
+                    const opt = document.createElement('option');
+                    opt.value = val;
+                    opt.innerText = `f/${val}`;
+                    if (forcePresetToMax && val === maxAperture) opt.selected = true;
+                    else if (!forcePresetToMax && previousValue === val) opt.selected = true;
+                    apertureSelect.appendChild(opt);
                 }
-                vignetteCauseEl.textContent = cause;
-                vignetteCauseEl.style.color = 'red';
+            });
+            if (apertureSelect.selectedIndex === -1 && apertureSelect.options.length > 0) {
+                apertureSelect.options[0].selected = true;
             }
         }
-        function calculateEffectiveDias() {
-            const focal = parseFloat(document.getElementById('focalLength').value) || 80;
-            const aperture = parseFloat(document.getElementById('aperture').value) || 2.8;
-            const lensDia = parseFloat(document.getElementById('lensDiaInput').value) || (focal / aperture);
-            const distLF = parseFloat(document.getElementById('distLFInput').value) || focal;
-            const distOF = Math.max(0.1, Math.min(parseFloat(document.getElementById('distOF').value) || 30, distLF - 0.1));
-            const distOL = distLF - distOF;
-            const r1 = distLF / distOL;
-            const apWidth = parseFloat(document.getElementById('apWidth').value) || 61;
-            const lensR = lensDia / 2;
-            const apR = apWidth / 2;
-            const effectiveR1 = lensR * (r1 - 1) + apR * r1;
-            const effectiveDia1 = 2 * effectiveR1;
 
-            // Second obstacle
-            const distSecondOF = Math.max(0.1, Math.min(parseFloat(document.getElementById('distSecondOF').value) || 20, distOF - 0.1));
-            const distSecondOL = distLF - distSecondOF;
-            const r2 = distLF / distSecondOL;
-            const secondApWidth = parseFloat(document.getElementById('secondApWidth').value) || 64;
-            const secondApR = secondApWidth / 2;
-            const effectiveR2 = lensR * (r2 - 1) + secondApR * r2;
-            const effectiveDia2 = 2 * effectiveR2;
+        document.getElementById('maxAperture').addEventListener('change', () => {
+            updateWorkingApertureDropdown(true); 
+            draw();
+        });
 
-            const effectiveDia = Math.min(effectiveDia1, effectiveDia2);
-            return { effectiveDia, effectiveDia1, effectiveDia2 };
-        }
+        const inputs = ['lensFocal', 'lensOffset', 'aperture', 'focusDistance', 'filmSize', 'distOF', 'apWidth', 'distSecondOF', 'secondApWidth'];
+        inputs.forEach(id => {
+            document.getElementById(id).addEventListener('input', draw);
+            document.getElementById(id).addEventListener('change', draw);
+        });
+
+        // Desktop Maus-Events
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
             const wheel = e.deltaY < 0 ? 1.1 : 0.9;
-            const oldZoom = zoom;
-            zoom *= wheel;
-            zoom = Math.max(0.1, Math.min(zoom, 10));
-            const factor = zoom / oldZoom;
-            panX = mouseX - (mouseX - panX) * factor;
-            panY = mouseY - (mouseY - panY) * factor;
+            zoom = Math.max(0.3, Math.min(zoom * wheel, 30));
             draw();
         });
-        canvas.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            lastX = e.clientX;
-            lastY = e.clientY;
-        });
+        canvas.addEventListener('mousedown', (e) => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
         canvas.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            const deltaX = e.clientX - lastX;
-            const deltaY = e.clientY - lastY;
-            panX += deltaX / zoom;
-            panY += deltaY / zoom;
-            lastX = e.clientX;
-            lastY = e.clientY;
+            panX += (e.clientX - lastX);
+            panY += (e.clientY - lastY);
+            lastX = e.clientX; lastY = e.clientY;
             draw();
         });
-        canvas.addEventListener('mouseup', () => { isDragging = false; });
-        canvas.addEventListener('mouseleave', () => { isDragging = false; });
+        window.addEventListener('mouseup', () => isDragging = false);
+
+        // Mobile Touch-Events
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                isDragging = true;
+                lastX = e.touches[0].clientX;
+                lastY = e.touches[0].clientY;
+            }
+        }, {passive: true});
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isDragging || e.touches.length !== 1) return;
+            panX += (e.touches[0].clientX - lastX);
+            panY += (e.touches[0].clientY - lastY);
+            lastX = e.touches[0].clientX;
+            lastY = e.touches[0].clientY;
+            draw();
+        }, {passive: true});
+
+        window.addEventListener('touchend', () => isDragging = false);
+
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const focal = parseFloat(document.getElementById('focalLength').value) || 80;
-            const aperture = parseFloat(document.getElementById('aperture').value) || 2.8;
-            const lensDia = parseFloat(document.getElementById('lensDiaInput').value) || (focal / aperture);
-            const distLF = parseFloat(document.getElementById('distLFInput').value) || focal;
-            const centerX = canvas.width / 2;
-            const scale = 3;
-            const filmSize = parseFloat(document.getElementById('filmSize').value) || 99.2;
-            const distOF = Math.max(0.1, Math.min(parseFloat(document.getElementById('distOF').value) || 30, distLF - 0.1));
-            const apWidth = parseFloat(document.getElementById('apWidth').value) || 61;
-            const distOL = distLF - distOF;
-            const r1 = distLF / distOL;
-            const lensR = lensDia / 2;
-            const apR = apWidth / 2;
-            const filmR = filmSize / 2;
-            const lensY = 150;
-            const parallelY = lensY - 200;
-            const openY = lensY + distOL * scale;
-            const filmY = lensY + distLF * scale;
-            const effectiveR1 = lensR * (r1 - 1) + apR * r1;
+            
+            const focalLength = parseFloat(document.getElementById('lensFocal').value) || 105;
+            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
+            const lensOffset = parseFloat(document.getElementById('lensOffset').value);
+            const fStop = parseFloat(document.getElementById('aperture').value) || maxAperture;
+            const focusInput = parseFloat(document.getElementById('focusDistance').value);
+            const filmSize = parseFloat(document.getElementById('filmSize').value);
+            const distOF = parseFloat(document.getElementById('distOF').value) || 41.5;
+            const apWidth = parseFloat(document.getElementById('apWidth').value) || 61.0;
+            const distSecondOF = parseFloat(document.getElementById('distSecondOF').value) || 39.0;
+            const secondApWidth = parseFloat(document.getElementById('secondApWidth').value) || 64.0;
 
-            // Second obstacle
-            const distSecondOF = Math.max(0.1, Math.min(parseFloat(document.getElementById('distSecondOF').value) || 20, distOF - 0.1));
-            const secondOpenY = lensY + (distLF - distSecondOF) * scale;
-            const distSecondOL = distLF - distSecondOF;
-            const r2 = distLF / distSecondOL;
-            const secondApWidth = parseFloat(document.getElementById('secondApWidth').value) || 64;
-            const secondApR = secondApWidth / 2;
-            const effectiveR2 = lensR * (r2 - 1) + secondApR * r2;
+            document.getElementById('focalDisplay').innerText = `${focalLength} mm`;
+            const offsetDisplay = document.getElementById('offsetDisplay');
+            if(lensOffset === 0) offsetDisplay.innerText = "0 mm (FFD Plane)";
+            else if(lensOffset > 0) offsetDisplay.innerText = `${lensOffset} mm behind FFD`;
+            else offsetDisplay.innerText = `${Math.abs(lensOffset)} mm in front of FFD`;
 
-            const effectiveR = Math.min(effectiveR1, effectiveR2);
-            const film_left_x = centerX - effectiveR * scale;
-            const film_right_x = centerX + effectiveR * scale;
+            let g = focusInput * 1000; 
+            let b = focalLength;       
+            const displayBox = document.getElementById('focusDistDisplay');
+            if (focusInput >= 10.0) {
+                displayBox.innerText = "Infinity (∞)";
+                b = focalLength;
+            } else {
+                displayBox.innerText = focusInput.toFixed(1) + " m";
+                b = (g * focalLength) / (g - focalLength);
+            }
+
+            const bellowsExtension = b - focalLength; 
+            const ffdNullX = filmX - b; 
+            const lensX = ffdNullX + lensOffset; 
+
+            const lensDiameter = focalLength / maxAperture; 
+            const lensRadius = lensDiameter / 2;
+            const apertureRadius = (focalLength / fStop) / 2;
 
             ctx.save();
             ctx.translate(panX, panY);
             ctx.scale(zoom, zoom);
-            // Optische Achse
-            ctx.strokeStyle = '#aaa';
-            ctx.setLineDash([8 / zoom, 8 / zoom]);
+
+            // Axis
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 1 / zoom;
+            ctx.beginPath(); ctx.moveTo(-150, 0); ctx.lineTo(filmX + 50, 0); ctx.stroke();
+
+            let helicoidX = filmX - distOF;
+            let flangeX = filmX - distSecondOF;
+
+            // Helicoid
+            ctx.strokeStyle = "rgba(255, 50, 50, 0.85)"; ctx.lineWidth = 2 / zoom;
             ctx.beginPath();
-            ctx.moveTo(50, lensY);
-            ctx.lineTo(canvas.width, lensY);
+            ctx.moveTo(helicoidX, -80); ctx.lineTo(helicoidX, -apWidth / 2);
+            ctx.moveTo(helicoidX, apWidth / 2); ctx.lineTo(helicoidX, 80);
             ctx.stroke();
-            ctx.setLineDash([]);
-            // Linse Symbol
-            ctx.strokeStyle = 'blue';
-            ctx.lineWidth = 3 / zoom;
+
+            // Flange
+            ctx.strokeStyle = "rgba(255, 140, 0, 0.85)"; ctx.lineWidth = 2 / zoom;
             ctx.beginPath();
-            ctx.moveTo(centerX, lensY - 80);
-            ctx.lineTo(centerX, lensY + 80);
+            ctx.moveTo(flangeX, -80); ctx.lineTo(flangeX, -secondApWidth / 2);
+            ctx.moveTo(flangeX, secondApWidth / 2); ctx.lineTo(flangeX, 80);
             ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(centerX - 25, lensY - 60);
-            ctx.lineTo(centerX, lensY);
-            ctx.lineTo(centerX - 25, lensY + 60);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(centerX + 25, lensY - 60);
-            ctx.lineTo(centerX, lensY);
-            ctx.lineTo(centerX + 25, lensY + 60);
-            ctx.stroke();
-            // Flange (red)
-            ctx.strokeStyle = 'red';
-            ctx.lineWidth = 4 / zoom;
-            ctx.beginPath();
-            ctx.moveTo(centerX - apR * scale, openY);
-            ctx.lineTo(centerX + apR * scale, openY);
-            ctx.stroke();
-            // Second obstacle (orange)
-            ctx.strokeStyle = 'orange';
-            ctx.lineWidth = 4 / zoom;
-            ctx.beginPath();
-            ctx.moveTo(centerX - secondApR * scale, secondOpenY);
-            ctx.lineTo(centerX + secondApR * scale, secondOpenY);
-            ctx.stroke();
-            // Brennebene
-            ctx.strokeStyle = (2 * effectiveR < filmSize) ? 'orange' : 'green';
-            ctx.lineWidth = 2 / zoom;
-            ctx.beginPath();
-            ctx.moveTo(centerX - filmR * scale, filmY);
-            ctx.lineTo(centerX + filmR * scale, filmY);
-            ctx.stroke();
-            // Brennpunkt
-            ctx.fillStyle = 'black';
-            ctx.beginPath();
-            ctx.arc(centerX, filmY, 4 / zoom, 0, Math.PI * 2);
-            ctx.fill();
-            // Chief Ray
-            ctx.strokeStyle = 'purple';
-            ctx.lineWidth = 1.5 / zoom;
-            ctx.beginPath();
-            ctx.moveTo(centerX, parallelY);
-            ctx.lineTo(centerX, filmY);
-            ctx.stroke();
-            // Actual cone (crossed)
-            ctx.strokeStyle = 'black';
-            ctx.lineWidth = 1.2 / zoom;
-            ctx.beginPath();
-            ctx.moveTo(centerX + lensR * scale, parallelY);
-            ctx.lineTo(centerX + lensR * scale, lensY);
-            ctx.lineTo(film_left_x, filmY);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(centerX - lensR * scale, parallelY);
-            ctx.lineTo(centerX - lensR * scale, lensY);
-            ctx.lineTo(film_right_x, filmY);
-            ctx.stroke();
-            // Desired full cone when vignetting
-            if (2 * effectiveR < filmSize) {
-                ctx.strokeStyle = 'gray';
-                ctx.lineWidth = 1.5 / zoom;
-                ctx.setLineDash([10 / zoom, 5 / zoom]);
-                ctx.beginPath();
-                ctx.moveTo(centerX + lensR * scale, lensY);
-                ctx.lineTo(centerX - filmR * scale, filmY);
+
+            // Film
+            ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 2.5 / zoom;
+            ctx.beginPath(); ctx.moveTo(filmX, -filmSize / 2); ctx.lineTo(filmX, filmSize / 2); ctx.stroke();
+
+            // FFD Line
+            ctx.strokeStyle = "rgba(0, 100, 255, 0.7)"; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([4, 4]);
+            ctx.beginPath(); ctx.moveTo(ffdNullX, -50); ctx.lineTo(ffdNullX, 50); ctx.stroke(); ctx.setLineDash([]); 
+
+            ctx.fillStyle = "rgba(0, 140, 255, 1)"; ctx.font = `${10 / zoom}px Arial`;
+            ctx.fillText("FFD Plane", ffdNullX + 4, -40);
+
+            // Lens Cell
+            ctx.strokeStyle = "rgba(0, 210, 255, 0.8)"; ctx.lineWidth = 2 / zoom;
+            ctx.beginPath(); ctx.ellipse(lensX, 0, 3, lensRadius, 0, 0, 2 * Math.PI); ctx.stroke();
+
+            // Iris
+            ctx.strokeStyle = "#ffcc00"; ctx.lineWidth = 3 / zoom;
+            ctx.beginPath(); ctx.moveTo(lensX, -apertureRadius); ctx.lineTo(lensX, apertureRadius); ctx.stroke();
+
+            // Ray Trace
+            let totalRays = 31; let blockedRays = 0; let firstBlockedY = null; 
+
+            for (let i = 0; i < totalRays; i++) {
+                let targetFilmY = -(filmSize / 2) + (i * (filmSize / (totalRays - 1)));
+                let startLensY = -apertureRadius + (i * ((apertureRadius * 2) / (totalRays - 1)));
+
+                let progressHelicoid = (helicoidX - lensX) / (filmX - lensX);
+                let yAtHelicoid = startLensY + progressHelicoid * (targetFilmY - startLensY);
+
+                let progressFlange = (flangeX - lensX) / (filmX - lensX);
+                let yAtFlange = startLensY + progressFlange * (targetFilmY - startLensY);
+
+                ctx.beginPath(); ctx.moveTo(lensX, startLensY);
+                let isBlocked = Math.abs(yAtHelicoid) > apWidth / 2 || Math.abs(yAtFlange) > secondApWidth / 2;
+
+                if (isBlocked) {
+                    blockedRays++;
+                    if (firstBlockedY === null || Math.abs(targetFilmY) < Math.abs(firstBlockedY)) firstBlockedY = targetFilmY;
+                    ctx.strokeStyle = "rgba(255, 50, 50, 0.15)";
+                    ctx.lineTo(Math.abs(yAtHelicoid) > apWidth / 2 ? helicoidX : flangeX, Math.abs(yAtHelicoid) > apWidth / 2 ? yAtHelicoid : yAtFlange);
+                } else {
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+                    ctx.lineTo(filmX, targetFilmY);
+                }
                 ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(centerX - lensR * scale, lensY);
-                ctx.lineTo(centerX + filmR * scale, filmY);
-                ctx.stroke();
-                ctx.setLineDash([]);
             }
             ctx.restore();
+
+            // Metrics Output
+            const statusBox = document.getElementById('statusBox');
+            let realDist = (filmX - lensX).toFixed(1);
+            let extensionInfo = bellowsExtension > 0 ? `<br>• Bellows Extension: +${bellowsExtension.toFixed(1)} mm` : '';
+            let projectedDiameter = firstBlockedY !== null ? Math.abs(firstBlockedY) * 2 : filmSize;
+
+            const formatInfo = `• Required Image Circle: <b>${filmSize.toFixed(1)} mm</b><br>
+                                • Actual Projected Image Circle: <b>${projectedDiameter.toFixed(1)} mm</b><br><br>`;
+
+            if (blockedRays === 0) {
+                statusBox.className = "status-box status-ok";
+                statusBox.innerHTML = `Frankenstein Simulator Status:<br>${formatInfo}
+                                       ✓ Max Lens Speed: f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
+                                       ✓ Working Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
+                                       ✓ Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
+                                       ✓ 100% Coverage. No mechanical vignetting!`;
+            } else {
+                statusBox.className = "status-box status-warn";
+                let freePercent = Math.round(((totalRays - blockedRays) / totalRays) * 100);
+                statusBox.innerHTML = `⚠️ Vignetting Detected!<br>${formatInfo}
+                                       • Max Lens Speed: f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
+                                       • Working Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
+                                       • Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
+                                       • Only approx. ${freePercent}% of the light cone covers the format.`;
+            }
         }
-        updateComputeds();
+
+        resetCentering();
+        updateWorkingApertureDropdown(true);
         draw();
-        updateInfo();
     </script>
 </body>
 </html>
