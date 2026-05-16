@@ -8,7 +8,6 @@
         body { font-family: Arial, sans-serif; margin: 0; padding: 10px; background-color: #f4f4f4; }
         .container { display: flex; flex-direction: column; gap: 20px; max-width: 1200px; margin: 0 auto; }
         
-        /* Desktop-Layout ab 768px Breite */
         @media (min-width: 768px) {
             body { padding: 20px; }
             .container { flex-direction: row; }
@@ -18,7 +17,7 @@
         .canvas-container { flex: 2; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
         
         label { display: block; margin: 12px 0 4px 0; font-weight: bold; font-size: 0.95em; }
-        input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 16px; /* Verhindert Auto-Zoom bei iOS */ }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
         
         canvas { background: #111; border: 1px solid #ddd; border-radius: 4px; width: 100%; height: auto; display: block; }
         p { color: #666; font-size: 0.8em; margin: 8px 0; }
@@ -173,7 +172,6 @@
             document.getElementById(id).addEventListener('change', draw);
         });
 
-        // Desktop Maus-Events
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             const wheel = e.deltaY < 0 ? 1.1 : 0.9;
@@ -190,7 +188,6 @@
         });
         window.addEventListener('mouseup', () => isDragging = false);
 
-        // Mobile Touch-Events
         canvas.addEventListener('touchstart', (e) => {
             if (e.touches.length === 1) {
                 isDragging = true;
@@ -198,16 +195,13 @@
                 lastY = e.touches[0].clientY;
             }
         }, {passive: true});
-
         canvas.addEventListener('touchmove', (e) => {
             if (!isDragging || e.touches.length !== 1) return;
             panX += (e.touches[0].clientX - lastX);
             panY += (e.touches[0].clientY - lastY);
-            lastX = e.touches[0].clientX;
-            lastY = e.touches[0].clientY;
+            lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
             draw();
         }, {passive: true});
-
         window.addEventListener('touchend', () => isDragging = false);
 
         function draw() {
@@ -260,28 +254,27 @@
             let helicoidX = filmX - distOF;
             let flangeX = filmX - distSecondOF;
 
-            // Helicoid
+            // Helicoid (Rot)
             ctx.strokeStyle = "rgba(255, 50, 50, 0.85)"; ctx.lineWidth = 2 / zoom;
             ctx.beginPath();
             ctx.moveTo(helicoidX, -80); ctx.lineTo(helicoidX, -apWidth / 2);
             ctx.moveTo(helicoidX, apWidth / 2); ctx.lineTo(helicoidX, 80);
             ctx.stroke();
 
-            // Flange
+            // Flange (Orange)
             ctx.strokeStyle = "rgba(255, 140, 0, 0.85)"; ctx.lineWidth = 2 / zoom;
             ctx.beginPath();
             ctx.moveTo(flangeX, -80); ctx.lineTo(flangeX, -secondApWidth / 2);
             ctx.moveTo(flangeX, secondApWidth / 2); ctx.lineTo(flangeX, 80);
             ctx.stroke();
 
-            // Film
+            // Film (Grün)
             ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 2.5 / zoom;
             ctx.beginPath(); ctx.moveTo(filmX, -filmSize / 2); ctx.lineTo(filmX, filmSize / 2); ctx.stroke();
 
             // FFD Line
             ctx.strokeStyle = "rgba(0, 100, 255, 0.7)"; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([4, 4]);
             ctx.beginPath(); ctx.moveTo(ffdNullX, -50); ctx.lineTo(ffdNullX, 50); ctx.stroke(); ctx.setLineDash([]); 
-
             ctx.fillStyle = "rgba(0, 140, 255, 1)"; ctx.font = `${10 / zoom}px Arial`;
             ctx.fillText("FFD Plane", ffdNullX + 4, -40);
 
@@ -289,12 +282,35 @@
             ctx.strokeStyle = "rgba(0, 210, 255, 0.8)"; ctx.lineWidth = 2 / zoom;
             ctx.beginPath(); ctx.ellipse(lensX, 0, 3, lensRadius, 0, 0, 2 * Math.PI); ctx.stroke();
 
-            // Iris
+            // Iris (Gelb)
             ctx.strokeStyle = "#ffcc00"; ctx.lineWidth = 3 / zoom;
-            ctx.beginPath(); ctx.moveTo(lensX, -apertureRadius); ctx.lineTo(lensX, apertureRadius); ctx.stroke();
+            ctx.beginPath(); 
+            ctx.moveTo(lensX, -lensRadius); ctx.lineTo(lensX, -apertureRadius);
+            ctx.moveTo(lensX, apertureRadius); ctx.lineTo(lensX, lensRadius);
+            ctx.stroke();
 
-            // Ray Trace
-            let totalRays = 31; let blockedRays = 0; let firstBlockedY = null; 
+            // --- STRICKTE GEOMETRISCHE NETTO-BILDKREIS-BERECHNUNG ---
+            // Berechnet das stufenlose Ende des schattierungsfreien Kernbereichs auf dem Film.
+            // Der Strahl startet an der Unterkante der Blende (-apertureRadius) und tangiert die Oberkante des mechanischen Hindernisses (+apWidth/2).
+            let maxFilmYByHelicoid = Infinity;
+            if (helicoidX > lensX) {
+                maxFilmYByHelicoid = ((apWidth / 2) * (filmX - lensX) - apertureRadius * (filmX - helicoidX)) / (helicoidX - lensX);
+            }
+
+            let maxFilmYByFlange = Infinity;
+            if (flangeX > lensX) {
+                maxFilmYByFlange = ((secondApWidth / 2) * (filmX - lensX) - apertureRadius * (filmX - flangeX)) / (flangeX - lensX);
+            }
+
+            // Das restriktivste Hindernis gewinnt
+            let maxTrueFilmY = Math.min(maxFilmYByHelicoid, maxFilmYByFlange);
+            if (maxTrueFilmY < 0) maxTrueFilmY = 0;
+
+            let projectedDiameter = maxTrueFilmY * 2;
+
+            // Ray Trace Visualisierung
+            let totalRays = 31; 
+            let actualVignettingDetected = false;
 
             for (let i = 0; i < totalRays; i++) {
                 let targetFilmY = -(filmSize / 2) + (i * (filmSize / (totalRays - 1)));
@@ -310,8 +326,7 @@
                 let isBlocked = Math.abs(yAtHelicoid) > apWidth / 2 || Math.abs(yAtFlange) > secondApWidth / 2;
 
                 if (isBlocked) {
-                    blockedRays++;
-                    if (firstBlockedY === null || Math.abs(targetFilmY) < Math.abs(firstBlockedY)) firstBlockedY = targetFilmY;
+                    actualVignettingDetected = true;
                     ctx.strokeStyle = "rgba(255, 50, 50, 0.15)";
                     ctx.lineTo(Math.abs(yAtHelicoid) > apWidth / 2 ? helicoidX : flangeX, Math.abs(yAtHelicoid) > apWidth / 2 ? yAtHelicoid : yAtFlange);
                 } else {
@@ -322,30 +337,34 @@
             }
             ctx.restore();
 
+            // Falls die Geometrie keine Shading-Grenzen vor dem Filmformat aufweist, decken wir es voll ab
+            if (projectedDiameter > filmSize && !actualVignettingDetected) {
+                projectedDiameter = filmSize;
+            }
+
             // Metrics Output
             const statusBox = document.getElementById('statusBox');
             let realDist = (filmX - lensX).toFixed(1);
             let extensionInfo = bellowsExtension > 0 ? `<br>• Bellows Extension: +${bellowsExtension.toFixed(1)} mm` : '';
-            let projectedDiameter = firstBlockedY !== null ? Math.abs(firstBlockedY) * 2 : filmSize;
 
             const formatInfo = `• Required Image Circle: <b>${filmSize.toFixed(1)} mm</b><br>
                                 • Actual Projected Image Circle: <b>${projectedDiameter.toFixed(1)} mm</b><br><br>`;
 
-            if (blockedRays === 0) {
+            if (!actualVignettingDetected && projectedDiameter >= filmSize) {
                 statusBox.className = "status-box status-ok";
                 statusBox.innerHTML = `Frankenstein Simulator Status:<br>${formatInfo}
-                                       ✓ Max Lens Speed: f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
-                                       ✓ Working Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
+                                       ✓ Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
+                                       ✓ Selected Working Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
                                        ✓ Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
                                        ✓ 100% Coverage. No mechanical vignetting!`;
             } else {
                 statusBox.className = "status-box status-warn";
-                let freePercent = Math.round(((totalRays - blockedRays) / totalRays) * 100);
+                let coveragePercent = Math.min(100, Math.round((projectedDiameter / filmSize) * 100));
                 statusBox.innerHTML = `⚠️ Vignetting Detected!<br>${formatInfo}
-                                       • Max Lens Speed: f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
-                                       • Working Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
+                                       • Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
+                                       • Selected Working Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
                                        • Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
-                                       • Only approx. ${freePercent}% of the light cone covers the format.`;
+                                       • Only approx. ${coveragePercent}% of the required format diagonal is illuminated.`;
             }
         }
 
