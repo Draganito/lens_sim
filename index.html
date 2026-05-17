@@ -19,6 +19,9 @@
         label { display: block; margin: 12px 0 4px 0; font-weight: bold; font-size: 0.95em; }
         input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
         
+        .checkbox-container { display: flex; align-items: center; gap: 10px; margin: 15px 0; font-weight: bold; font-size: 0.95em; cursor: pointer; }
+        .checkbox-container input { width: auto; cursor: pointer; }
+
         canvas { background: #111; border: 1px solid #ddd; border-radius: 4px; width: 100%; height: auto; display: block; }
         p { color: #666; font-size: 0.8em; margin: 8px 0; }
         hr { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
@@ -82,6 +85,10 @@
 
             <label>Working Aperture (Aperture f/):</label>
             <select id="aperture"></select>
+            
+            <label class="checkbox-container">
+                <input type="checkbox" id="previewMaxAp"> Mattscheiben-Ansicht (Vorschau bei Offenblende)
+            </label>
             
             <hr>
             <label>Focus Distance: <span id="focusDistDisplay" class="value-display">Infinity</span></label>
@@ -166,7 +173,7 @@
             draw();
         });
 
-        const inputs = ['lensFocal', 'lensOffset', 'aperture', 'focusDistance', 'filmSize', 'distOF', 'apWidth', 'distSecondOF', 'secondApWidth'];
+        const inputs = ['lensFocal', 'lensOffset', 'aperture', 'previewMaxAp', 'focusDistance', 'filmSize', 'distOF', 'apWidth', 'distSecondOF', 'secondApWidth'];
         inputs.forEach(id => {
             document.getElementById(id).addEventListener('input', draw);
             document.getElementById(id).addEventListener('change', draw);
@@ -210,7 +217,11 @@
             const focalLength = parseFloat(document.getElementById('lensFocal').value) || 105;
             const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
             const lensOffset = parseFloat(document.getElementById('lensOffset').value);
-            const fStop = parseFloat(document.getElementById('aperture').value) || maxAperture;
+            const selectfStop = parseFloat(document.getElementById('aperture').value) || maxAperture;
+            const previewMaxAp = document.getElementById('previewMaxAp').checked;
+            
+            const fStop = previewMaxAp ? maxAperture : selectfStop;
+
             const focusInput = parseFloat(document.getElementById('focusDistance').value);
             const filmSize = parseFloat(document.getElementById('filmSize').value);
             const distOF = parseFloat(document.getElementById('distOF').value) || 41.5;
@@ -247,7 +258,7 @@
             ctx.translate(panX, panY);
             ctx.scale(zoom, zoom);
 
-            // Axis
+            // Achse
             ctx.strokeStyle = '#333'; ctx.lineWidth = 1 / zoom;
             ctx.beginPath(); ctx.moveTo(-150, 0); ctx.lineTo(filmX + 50, 0); ctx.stroke();
 
@@ -272,7 +283,7 @@
             ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 2.5 / zoom;
             ctx.beginPath(); ctx.moveTo(filmX, -filmSize / 2); ctx.lineTo(filmX, filmSize / 2); ctx.stroke();
 
-            // FFD Line
+            // FFD Linie
             ctx.strokeStyle = "rgba(0, 100, 255, 0.7)"; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([4, 4]);
             ctx.beginPath(); ctx.moveTo(ffdNullX, -50); ctx.lineTo(ffdNullX, 50); ctx.stroke(); ctx.setLineDash([]); 
             ctx.fillStyle = "rgba(0, 140, 255, 1)"; ctx.font = `${10 / zoom}px Arial`;
@@ -289,32 +300,14 @@
             ctx.moveTo(lensX, apertureRadius); ctx.lineTo(lensX, lensRadius);
             ctx.stroke();
 
-            // --- STRICKTE GEOMETRISCHE NETTO-BILDKREIS-BERECHNUNG ---
-            // Berechnet das stufenlose Ende des schattierungsfreien Kernbereichs auf dem Film.
-            // Der Strahl startet an der Unterkante der Blende (-apertureRadius) und tangiert die Oberkante des mechanischen Hindernisses (+apWidth/2).
-            let maxFilmYByHelicoid = Infinity;
-            if (helicoidX > lensX) {
-                maxFilmYByHelicoid = ((apWidth / 2) * (filmX - lensX) - apertureRadius * (filmX - helicoidX)) / (helicoidX - lensX);
-            }
-
-            let maxFilmYByFlange = Infinity;
-            if (flangeX > lensX) {
-                maxFilmYByFlange = ((secondApWidth / 2) * (filmX - lensX) - apertureRadius * (filmX - flangeX)) / (flangeX - lensX);
-            }
-
-            // Das restriktivste Hindernis gewinnt
-            let maxTrueFilmY = Math.min(maxFilmYByHelicoid, maxFilmYByFlange);
-            if (maxTrueFilmY < 0) maxTrueFilmY = 0;
-
-            let projectedDiameter = maxTrueFilmY * 2;
-
-            // Ray Trace Visualisierung
-            let totalRays = 31; 
-            let actualVignettingDetected = false;
+            // --- VISUELLE UND MATHEMATISCHE KOPPLUNG PER RAY-TRACE ---
+            let totalRays = 41; 
+            let maxClearY = 0; // Hier erfassen wir den tatsächlichen, ungehinderten Bildradius
 
             for (let i = 0; i < totalRays; i++) {
-                let targetFilmY = -(filmSize / 2) + (i * (filmSize / (totalRays - 1)));
-                let startLensY = -apertureRadius + (i * ((apertureRadius * 2) / (totalRays - 1)));
+                // Wir testen Strahlen im gesamten theoretisch möglichen Raum
+                let targetFilmY = -(filmSize * 1.2 / 2) + (i * ((filmSize * 1.2) / (totalRays - 1)));
+                let startLensY = apertureRadius - (i * ((apertureRadius * 2) / (totalRays - 1)));
 
                 let progressHelicoid = (helicoidX - lensX) / (filmX - lensX);
                 let yAtHelicoid = startLensY + progressHelicoid * (targetFilmY - startLensY);
@@ -322,23 +315,38 @@
                 let progressFlange = (flangeX - lensX) / (filmX - lensX);
                 let yAtFlange = startLensY + progressFlange * (targetFilmY - startLensY);
 
-                ctx.beginPath(); ctx.moveTo(lensX, startLensY);
                 let isBlocked = Math.abs(yAtHelicoid) > apWidth / 2 || Math.abs(yAtFlange) > secondApWidth / 2;
 
+                // Nur zeichnen, wenn sich der Strahl innerhalb des gewählten Filmformats befindet
+                let withinFilmFormat = Math.abs(targetFilmY) <= filmSize / 2;
+
                 if (isBlocked) {
-                    actualVignettingDetected = true;
-                    ctx.strokeStyle = "rgba(255, 50, 50, 0.15)";
-                    ctx.lineTo(Math.abs(yAtHelicoid) > apWidth / 2 ? helicoidX : flangeX, Math.abs(yAtHelicoid) > apWidth / 2 ? yAtHelicoid : yAtFlange);
+                    if (withinFilmFormat) {
+                        ctx.beginPath(); ctx.moveTo(lensX, startLensY);
+                        ctx.strokeStyle = "rgba(255, 50, 50, 0.15)";
+                        ctx.lineTo(Math.abs(yAtHelicoid) > apWidth / 2 ? helicoidX : flangeX, Math.abs(yAtHelicoid) > apWidth / 2 ? yAtHelicoid : yAtFlange);
+                        ctx.stroke();
+                    }
                 } else {
-                    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-                    ctx.lineTo(filmX, targetFilmY);
+                    // Strahl geht frei durch! Wenn er das tut, erweitert er unseren echten belichteten Bildkreis
+                    if (Math.abs(targetFilmY) > maxClearY) {
+                        maxClearY = Math.abs(targetFilmY);
+                    }
+                    if (withinFilmFormat) {
+                        ctx.beginPath(); ctx.moveTo(lensX, startLensY);
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+                        ctx.lineTo(filmX, targetFilmY);
+                        ctx.stroke();
+                    }
                 }
-                ctx.stroke();
             }
             ctx.restore();
 
-            // Falls die Geometrie keine Shading-Grenzen vor dem Filmformat aufweist, decken wir es voll ab
-            if (projectedDiameter > filmSize && !actualVignettingDetected) {
+            // Der tatsächliche Bildkreis ist der Durchmesser des unblockierten Bereichs
+            let projectedDiameter = maxClearY * 2;
+            
+            // Verhinderung von Rundungsfehlern bei voller Ausleuchtung
+            if (projectedDiameter > filmSize - 0.5 && projectedDiameter < filmSize + 1.0) {
                 projectedDiameter = filmSize;
             }
 
@@ -350,19 +358,19 @@
             const formatInfo = `• Required Image Circle: <b>${filmSize.toFixed(1)} mm</b><br>
                                 • Actual Projected Image Circle: <b>${projectedDiameter.toFixed(1)} mm</b><br><br>`;
 
-            if (!actualVignettingDetected && projectedDiameter >= filmSize) {
+            if (projectedDiameter >= filmSize) {
                 statusBox.className = "status-box status-ok";
-                statusBox.innerHTML = `Frankenstein Simulator Status:<br>${formatInfo}
+                statusBox.innerHTML = `Frankenstein Simulator Status:${previewMaxAp ? " <b>(Mattscheiben-Vorschau aktiv)</b>" : ""}<br>${formatInfo}
                                        ✓ Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
-                                       ✓ Selected Working Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
+                                       ✓ Simulated Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
                                        ✓ Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
                                        ✓ 100% Coverage. No mechanical vignetting!`;
             } else {
                 statusBox.className = "status-box status-warn";
                 let coveragePercent = Math.min(100, Math.round((projectedDiameter / filmSize) * 100));
-                statusBox.innerHTML = `⚠️ Vignetting Detected!<br>${formatInfo}
+                statusBox.innerHTML = `⚠️ Vignetting Detected!${previewMaxAp ? " <b>(Mattscheiben-Vorschau aktiv)</b>" : ""}<br>${formatInfo}
                                        • Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
-                                       • Selected Working Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
+                                       • Simulated Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
                                        • Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
                                        • Only approx. ${coveragePercent}% of the required format diagonal is illuminated.`;
             }
