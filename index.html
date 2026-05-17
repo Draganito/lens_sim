@@ -160,7 +160,7 @@
                     opt.innerText = `f/${val}`;
                     if (forcePresetToMax && val === maxAperture) opt.selected = true;
                     else if (!forcePresetToMax && previousValue === val) opt.selected = true;
-                    apertureSelect.appendChild(opt);
+                    options = apertureSelect.appendChild(opt);
                 }
             });
             if (apertureSelect.selectedIndex === -1 && apertureSelect.options.length > 0) {
@@ -300,55 +300,72 @@
             ctx.moveTo(lensX, apertureRadius); ctx.lineTo(lensX, lensRadius);
             ctx.stroke();
 
-            // --- VISUELLE UND MATHEMATISCHE KOPPLUNG PER RAY-TRACE ---
-            let totalRays = 41; 
-            let maxClearY = 0; // Hier erfassen wir den tatsächlichen, ungehinderten Bildradius
+            // --- VISUELLE UND MATHEMATISCHE KOPPLUNG PER RAY-TRACE (KORRIGIERT) ---
+            const progressHelicoid = (helicoidX - lensX) / (filmX - lensX);
+            const progressFlange = (flangeX - lensX) / (filmX - lensX);
 
-            for (let i = 0; i < totalRays; i++) {
-                // Wir testen Strahlen im gesamten theoretisch möglichen Raum
-                let targetFilmY = -(filmSize * 1.2 / 2) + (i * ((filmSize * 1.2) / (totalRays - 1)));
-                let startLensY = apertureRadius - (i * ((apertureRadius * 2) / (totalRays - 1)));
+            // 1. Mathematisch exakte analytische Berechnung der physikalischen Bildkreise
+            let unvignettedRadius = Infinity;
+            let totalLightRadius = Infinity;
 
-                let progressHelicoid = (helicoidX - lensX) / (filmX - lensX);
-                let yAtHelicoid = startLensY + progressHelicoid * (targetFilmY - startLensY);
-
-                let progressFlange = (flangeX - lensX) / (filmX - lensX);
-                let yAtFlange = startLensY + progressFlange * (targetFilmY - startLensY);
-
-                let isBlocked = Math.abs(yAtHelicoid) > apWidth / 2 || Math.abs(yAtFlange) > secondApWidth / 2;
-
-                // Nur zeichnen, wenn sich der Strahl innerhalb des gewählten Filmformats befindet
-                let withinFilmFormat = Math.abs(targetFilmY) <= filmSize / 2;
-
-                if (isBlocked) {
-                    if (withinFilmFormat) {
-                        ctx.beginPath(); ctx.moveTo(lensX, startLensY);
-                        ctx.strokeStyle = "rgba(255, 50, 50, 0.15)";
-                        ctx.lineTo(Math.abs(yAtHelicoid) > apWidth / 2 ? helicoidX : flangeX, Math.abs(yAtHelicoid) > apWidth / 2 ? yAtHelicoid : yAtFlange);
-                        ctx.stroke();
-                    }
-                } else {
-                    // Strahl geht frei durch! Wenn er das tut, erweitert er unseren echten belichteten Bildkreis
-                    if (Math.abs(targetFilmY) > maxClearY) {
-                        maxClearY = Math.abs(targetFilmY);
-                    }
-                    if (withinFilmFormat) {
-                        ctx.beginPath(); ctx.moveTo(lensX, startLensY);
-                        ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-                        ctx.lineTo(filmX, targetFilmY);
-                        ctx.stroke();
-                    }
-                }
+            // Überprüfung der Vignettierung durch das Helicoid
+            if (progressHelicoid > 0) {
+                let rHel = apWidth / 2;
+                let unvHel = (rHel - apertureRadius * (1 - progressHelicoid)) / progressHelicoid;
+                let totHel = (rHel + apertureRadius * (1 - progressHelicoid)) / progressHelicoid;
+                if (unvHel < unvignettedRadius) unvignettedRadius = Math.max(0, unvHel);
+                if (totHel < totalLightRadius) totalLightRadius = totHel;
             }
-            ctx.restore();
 
-            // Der tatsächliche Bildkreis ist der Durchmesser des unblockierten Bereichs
-            let projectedDiameter = maxClearY * 2;
+            // Überprüfung der Vignettierung durch den Flansch (Flange)
+            if (progressFlange > 0) {
+                let rFla = secondApWidth / 2;
+                let unvFla = (rFla - apertureRadius * (1 - progressFlange)) / progressFlange;
+                let totFla = (rFla + apertureRadius * (1 - progressFlange)) / progressFlange;
+                if (unvFla < unvignettedRadius) unvignettedRadius = Math.max(0, unvFla);
+                if (totFla < totalLightRadius) totalLightRadius = totFla;
+            }
+
+            // Der nutzbare Bildkreis ist der Durchmesser der 100%igen Vollausleuchtung
+            let projectedDiameter = unvignettedRadius * 2;
+            let absoluteMaxDiameter = totalLightRadius * 2;
             
-            // Verhinderung von Rundungsfehlern bei voller Ausleuchtung
+            // Verhinderung von Rundungsfehlern bei unendlicher Ausleuchtung
             if (projectedDiameter > filmSize - 0.5 && projectedDiameter < filmSize + 1.0) {
                 projectedDiameter = filmSize;
             }
+
+            // 2. Zeichnen der echten physikalischen Lichtkegel
+            // Wir visualisieren die Lichtkegel für 3 markante Filmpunkte: Obere Ecke, Mitte, Untere Ecke
+            const samplePointsFilm = [-filmSize / 2, 0, filmSize / 2];
+            const raysPerPoint = 11; // Anzahl der Strahlen pro Kegel zur Visualisierung
+
+            samplePointsFilm.forEach(targetFilmY => {
+                for (let a = 0; a < raysPerPoint; a++) {
+                    // Strahlen füllen die gesamte Blendenöffnung aus
+                    let startLensY = -apertureRadius + (a * ((apertureRadius * 2) / (raysPerPoint - 1)));
+
+                    let yAtHelicoid = startLensY + progressHelicoid * (targetFilmY - startLensY);
+                    let yAtFlange = startLensY + progressFlange * (targetFilmY - startLensY);
+
+                    let isBlocked = Math.abs(yAtHelicoid) > apWidth / 2 || Math.abs(yAtFlange) > secondApWidth / 2;
+
+                    ctx.beginPath();
+                    ctx.moveTo(lensX, startLensY);
+                    if (isBlocked) {
+                        ctx.strokeStyle = "rgba(255, 50, 50, 0.12)"; // Blockierte Strahlen (Rot)
+                        let isHelicoidBlock = Math.abs(yAtHelicoid) > apWidth / 2;
+                        let blockX = isHelicoidBlock ? helicoidX : flangeX;
+                        let blockY = isHelicoidBlock ? yAtHelicoid : yAtFlange;
+                        ctx.lineTo(blockX, blockY);
+                    } else {
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.35)"; // Freie Strahlen (Weiß)
+                        ctx.lineTo(filmX, targetFilmY);
+                    }
+                    ctx.stroke();
+                }
+            });
+            ctx.restore();
 
             // Metrics Output
             const statusBox = document.getElementById('statusBox');
@@ -356,7 +373,8 @@
             let extensionInfo = bellowsExtension > 0 ? `<br>• Bellows Extension: +${bellowsExtension.toFixed(1)} mm` : '';
 
             const formatInfo = `• Required Image Circle: <b>${filmSize.toFixed(1)} mm</b><br>
-                                • Actual Projected Image Circle: <b>${projectedDiameter.toFixed(1)} mm</b><br><br>`;
+                                • Actual Projected Image Circle (100% Light): <b>${projectedDiameter.toFixed(1)} mm</b><br>
+                                • Total Light Circle (Max Limit): <b>${absoluteMaxDiameter.toFixed(1)} mm</b><br><br>`;
 
             if (projectedDiameter >= filmSize) {
                 statusBox.className = "status-box status-ok";
@@ -372,7 +390,7 @@
                                        • Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
                                        • Simulated Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
                                        • Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
-                                       • Only approx. ${coveragePercent}% of the required format diagonal is illuminated.`;
+                                       • Only approx. ${coveragePercent}% of the required format diagonal is fully illuminated (100% Light).`;
             }
         }
 
