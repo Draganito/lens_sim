@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Frankenstein Kamera Simulator - by Dragan Bojovic</title>
+    <title>Frankenstein Camera Simulator - by Dragan Bojovic</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 10px; background-color: #f4f4f4; }
         .container { display: flex; flex-direction: column; gap: 20px; max-width: 1200px; margin: 0 auto; }
@@ -31,6 +31,21 @@
         .status-warn { background-color: #fce8e6; color: #c5221f; border: 1px solid #fad2cf; }
         .value-display { font-weight: normal; color: #555; float: right; }
         .credits { font-size: 0.85em; color: #888; font-style: italic; margin-top: -5px; margin-bottom: 15px; }
+
+        .btn-optimize {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 0.95em;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 15px;
+            transition: background 0.2s;
+        }
+        .btn-optimize:hover { background-color: #0056b3; }
     </style>
 </head>
 <body>
@@ -87,7 +102,7 @@
             <select id="aperture"></select>
             
             <label class="checkbox-container">
-                <input type="checkbox" id="previewMaxAp"> Mattscheiben-Ansicht (Vorschau bei Offenblende)
+                <input type="checkbox" id="previewMaxAp"> Ground Glass View (Preview at Open Aperture)
             </label>
             
             <hr>
@@ -120,6 +135,8 @@
             
             <label>Flange Opening Inner Diameter (mm): </label>
             <input type="number" id="secondApWidth" value="64.0" step="0.5">
+
+            <button type="button" class="btn-optimize" onclick="optimizeFlange()">Optimize Flange & Helicoid for 100% Light</button>
         </div>
     </div>
 
@@ -160,7 +177,7 @@
                     opt.innerText = `f/${val}`;
                     if (forcePresetToMax && val === maxAperture) opt.selected = true;
                     else if (!forcePresetToMax && previousValue === val) opt.selected = true;
-                    options = apertureSelect.appendChild(opt);
+                    apertureSelect.appendChild(opt);
                 }
             });
             if (apertureSelect.selectedIndex === -1 && apertureSelect.options.length > 0) {
@@ -211,6 +228,39 @@
         }, {passive: true});
         window.addEventListener('touchend', () => isDragging = false);
 
+        // Hilfsfunktion zur reinen Berechnung des projizierten Bildkreises (entkoppelt vom Zeichnen)
+        function calculateProjectedCircle(focalLength, maxAperture, lensOffset, fStop, focusInput, filmSize, distOF, apWidth, distSecondOF, secondApWidth) {
+            let g = focusInput * 1000;
+            let b = (focusInput >= 10.0) ? focalLength : (g * focalLength) / (g - focalLength);
+            
+            const lensX = filmX - b + lensOffset;
+            const apertureRadius = (focalLength / fStop) / 2;
+            const helicoidX = filmX - distOF;
+            const flangeX = filmX - distSecondOF;
+            
+            const totalDistance = filmX - lensX;
+            const progressHelicoid = totalDistance > 0 ? (helicoidX - lensX) / totalDistance : -1;
+            const progressFlange = totalDistance > 0 ? (flangeX - lensX) / totalDistance : -1;
+
+            let unvignettedRadius = Infinity;
+
+            if (progressHelicoid > 0 && progressHelicoid < 1) {
+                let rHel = apWidth / 2;
+                let unvHel = (rHel - apertureRadius * (1 - progressHelicoid)) / progressHelicoid;
+                if (unvHel < unvignettedRadius) unvignettedRadius = Math.max(0, unvHel);
+            }
+
+            if (progressFlange > 0 && progressFlange < 1) {
+                let rFla = secondApWidth / 2;
+                let unvFla = (rFla - apertureRadius * (1 - progressFlange)) / progressFlange;
+                if (unvFla < unvignettedRadius) unvignettedRadius = Math.max(0, unvFla);
+            }
+
+            let projDiam = unvignettedRadius === Infinity ? filmSize : unvignettedRadius * 2;
+            if (projDiam > filmSize - 0.5 && projDiam < filmSize + 1.0) projDiam = filmSize;
+            return projDiam;
+        }
+
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
@@ -258,14 +308,14 @@
             ctx.translate(panX, panY);
             ctx.scale(zoom, zoom);
 
-            // Achse
+            // Axis
             ctx.strokeStyle = '#333'; ctx.lineWidth = 1 / zoom;
             ctx.beginPath(); ctx.moveTo(-150, 0); ctx.lineTo(filmX + 50, 0); ctx.stroke();
 
             let helicoidX = filmX - distOF;
             let flangeX = filmX - distSecondOF;
 
-            // Helicoid (Rot)
+            // Helicoid (Red)
             ctx.strokeStyle = "rgba(255, 50, 50, 0.85)"; ctx.lineWidth = 2 / zoom;
             ctx.beginPath();
             ctx.moveTo(helicoidX, -80); ctx.lineTo(helicoidX, -apWidth / 2);
@@ -279,11 +329,11 @@
             ctx.moveTo(flangeX, secondApWidth / 2); ctx.lineTo(flangeX, 80);
             ctx.stroke();
 
-            // Film (Grün)
+            // Film (Green)
             ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 2.5 / zoom;
             ctx.beginPath(); ctx.moveTo(filmX, -filmSize / 2); ctx.lineTo(filmX, filmSize / 2); ctx.stroke();
 
-            // FFD Linie
+            // FFD Line
             ctx.strokeStyle = "rgba(0, 100, 255, 0.7)"; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([4, 4]);
             ctx.beginPath(); ctx.moveTo(ffdNullX, -50); ctx.lineTo(ffdNullX, 50); ctx.stroke(); ctx.setLineDash([]); 
             ctx.fillStyle = "rgba(0, 140, 255, 1)"; ctx.font = `${10 / zoom}px Arial`;
@@ -293,23 +343,22 @@
             ctx.strokeStyle = "rgba(0, 210, 255, 0.8)"; ctx.lineWidth = 2 / zoom;
             ctx.beginPath(); ctx.ellipse(lensX, 0, 3, lensRadius, 0, 0, 2 * Math.PI); ctx.stroke();
 
-            // Iris (Gelb)
+            // Iris (Yellow)
             ctx.strokeStyle = "#ffcc00"; ctx.lineWidth = 3 / zoom;
             ctx.beginPath(); 
             ctx.moveTo(lensX, -lensRadius); ctx.lineTo(lensX, -apertureRadius);
             ctx.moveTo(lensX, apertureRadius); ctx.lineTo(lensX, lensRadius);
             ctx.stroke();
 
-            // --- VISUELLE UND MATHEMATISCHE KOPPLUNG PER RAY-TRACE (KORRIGIERT) ---
-            const progressHelicoid = (helicoidX - lensX) / (filmX - lensX);
-            const progressFlange = (flangeX - lensX) / (filmX - lensX);
+            // --- COUPLING VIA DETAILED CHECK ---
+            const totalDistance = filmX - lensX;
+            const progressHelicoid = totalDistance > 0 ? (helicoidX - lensX) / totalDistance : -1;
+            const progressFlange = totalDistance > 0 ? (flangeX - lensX) / totalDistance : -1;
 
-            // 1. Mathematisch exakte analytische Berechnung der physikalischen Bildkreise
             let unvignettedRadius = Infinity;
             let totalLightRadius = Infinity;
 
-            // Überprüfung der Vignettierung durch das Helicoid
-            if (progressHelicoid > 0) {
+            if (progressHelicoid > 0 && progressHelicoid < 1) {
                 let rHel = apWidth / 2;
                 let unvHel = (rHel - apertureRadius * (1 - progressHelicoid)) / progressHelicoid;
                 let totHel = (rHel + apertureRadius * (1 - progressHelicoid)) / progressHelicoid;
@@ -317,8 +366,7 @@
                 if (totHel < totalLightRadius) totalLightRadius = totHel;
             }
 
-            // Überprüfung der Vignettierung durch den Flansch (Flange)
-            if (progressFlange > 0) {
+            if (progressFlange > 0 && progressFlange < 1) {
                 let rFla = secondApWidth / 2;
                 let unvFla = (rFla - apertureRadius * (1 - progressFlange)) / progressFlange;
                 let totFla = (rFla + apertureRadius * (1 - progressFlange)) / progressFlange;
@@ -326,40 +374,38 @@
                 if (totFla < totalLightRadius) totalLightRadius = totFla;
             }
 
-            // Der nutzbare Bildkreis ist der Durchmesser der 100%igen Vollausleuchtung
-            let projectedDiameter = unvignettedRadius * 2;
-            let absoluteMaxDiameter = totalLightRadius * 2;
+            let projectedDiameter = unvignettedRadius === Infinity ? filmSize : unvignettedRadius * 2;
+            let absoluteMaxDiameter = totalLightRadius === Infinity ? filmSize : totalLightRadius * 2;
             
-            // Verhinderung von Rundungsfehlern bei unendlicher Ausleuchtung
             if (projectedDiameter > filmSize - 0.5 && projectedDiameter < filmSize + 1.0) {
                 projectedDiameter = filmSize;
             }
 
-            // 2. Zeichnen der echten physikalischen Lichtkegel
-            // Wir visualisieren die Lichtkegel für 3 markante Filmpunkte: Obere Ecke, Mitte, Untere Ecke
+            // Ray-Tracing
             const samplePointsFilm = [-filmSize / 2, 0, filmSize / 2];
-            const raysPerPoint = 11; // Anzahl der Strahlen pro Kegel zur Visualisierung
+            const raysPerPoint = 11; 
 
             samplePointsFilm.forEach(targetFilmY => {
                 for (let a = 0; a < raysPerPoint; a++) {
-                    // Strahlen füllen die gesamte Blendenöffnung aus
                     let startLensY = -apertureRadius + (a * ((apertureRadius * 2) / (raysPerPoint - 1)));
 
                     let yAtHelicoid = startLensY + progressHelicoid * (targetFilmY - startLensY);
                     let yAtFlange = startLensY + progressFlange * (targetFilmY - startLensY);
 
-                    let isBlocked = Math.abs(yAtHelicoid) > apWidth / 2 || Math.abs(yAtFlange) > secondApWidth / 2;
+                    let isBlocked = false;
+                    if (progressHelicoid > 0 && progressHelicoid < 1 && Math.abs(yAtHelicoid) > apWidth / 2) isBlocked = true;
+                    if (progressFlange > 0 && progressFlange < 1 && Math.abs(yAtFlange) > secondApWidth / 2) isBlocked = true;
 
                     ctx.beginPath();
                     ctx.moveTo(lensX, startLensY);
                     if (isBlocked) {
-                        ctx.strokeStyle = "rgba(255, 50, 50, 0.12)"; // Blockierte Strahlen (Rot)
-                        let isHelicoidBlock = Math.abs(yAtHelicoid) > apWidth / 2;
+                        ctx.strokeStyle = "rgba(255, 50, 50, 0.12)"; 
+                        let isHelicoidBlock = (progressHelicoid > 0 && progressHelicoid < 1 && Math.abs(yAtHelicoid) > apWidth / 2);
                         let blockX = isHelicoidBlock ? helicoidX : flangeX;
                         let blockY = isHelicoidBlock ? yAtHelicoid : yAtFlange;
                         ctx.lineTo(blockX, blockY);
                     } else {
-                        ctx.strokeStyle = "rgba(255, 255, 255, 0.35)"; // Freie Strahlen (Weiß)
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.35)"; 
                         ctx.lineTo(filmX, targetFilmY);
                     }
                     ctx.stroke();
@@ -378,7 +424,7 @@
 
             if (projectedDiameter >= filmSize) {
                 statusBox.className = "status-box status-ok";
-                statusBox.innerHTML = `Frankenstein Simulator Status:${previewMaxAp ? " <b>(Mattscheiben-Vorschau aktiv)</b>" : ""}<br>${formatInfo}
+                statusBox.innerHTML = `Frankenstein Simulator Status:${previewMaxAp ? " <b>(Ground Glass Preview Active)</b>" : ""}<br>${formatInfo}
                                        ✓ Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
                                        ✓ Simulated Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
                                        ✓ Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
@@ -386,11 +432,55 @@
             } else {
                 statusBox.className = "status-box status-warn";
                 let coveragePercent = Math.min(100, Math.round((projectedDiameter / filmSize) * 100));
-                statusBox.innerHTML = `⚠️ Vignetting Detected!${previewMaxAp ? " <b>(Mattscheiben-Vorschau aktiv)</b>" : ""}<br>${formatInfo}
+                statusBox.innerHTML = `⚠️ Vignetting Detected!${previewMaxAp ? " <b>(Ground Glass Preview Active)</b>" : ""}<br>${formatInfo}
                                        • Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
                                        • Simulated Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
                                        • Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
                                        • Only approx. ${coveragePercent}% of the required format diagonal is fully illuminated (100% Light).`;
+            }
+        }
+
+        // KORRIGIERTE OPTIMIERUNGSEINGINE: Nutzt jetzt eine visuelle Iterationssuche (Failsafe bei extremem Linsen-Offset)
+        function optimizeFlange() {
+            const focalLength = parseFloat(document.getElementById('lensFocal').value) || 105;
+            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
+            const filmSize = parseFloat(document.getElementById('filmSize').value);
+            const focusInput = parseFloat(document.getElementById('focusDistance').value);
+            const lensOffset = parseFloat(document.getElementById('lensOffset').value) || 0;
+            
+            const apWidth = parseFloat(document.getElementById('apWidth').value) || 61.0;
+            const secondApWidth = parseFloat(document.getElementById('secondApWidth').value) || 64.0;
+            
+            const currentDistOF = parseFloat(document.getElementById('distOF').value) || 41.5;
+            const currentDistSecondOF = parseFloat(document.getElementById('distSecondOF').value) || 39.0;
+            const fixedComponentGap = currentDistOF - currentDistSecondOF; 
+
+            let bestDistSecondOF = currentDistSecondOF;
+            let foundSolution = false;
+
+            // Wir scannen den mechanisch sinnvollen Bereich von nah am Film (1mm) bis weit weg (200mm)
+            // und suchen die exakte Position, an der der projizierte Kreis maximal ausgeleuchtet ist
+            for (let testFlange = 1.0; testFlange <= 200.0; testFlange += 0.1) {
+                let testHelicoid = testFlange + fixedComponentGap;
+                
+                let resultCircle = calculateProjectedCircle(
+                    focalLength, maxAperture, lensOffset, maxAperture, 
+                    focusInput, filmSize, testHelicoid, apWidth, testFlange, secondApWidth
+                );
+
+                if (resultCircle >= filmSize) {
+                    bestDistSecondOF = testFlange;
+                    foundSolution = true;
+                    break; // Erste funktionierende Position von Film aus gesehen ist die kompakteste/beste!
+                }
+            }
+
+            if (foundSolution) {
+                document.getElementById('distSecondOF').value = bestDistSecondOF.toFixed(1);
+                document.getElementById('distOF').value = (bestDistSecondOF + fixedComponentGap).toFixed(1);
+                draw(); 
+            } else {
+                alert("100% light coverage is mechanically impossible with this layout! Increase the internal barrel diameters or pick a smaller film format.");
             }
         }
 
