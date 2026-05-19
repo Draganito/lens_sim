@@ -228,7 +228,6 @@
         }, {passive: true});
         window.addEventListener('touchend', () => isDragging = false);
 
-        // Hilfsfunktion zur reinen Berechnung des projizierten Bildkreises (entkoppelt vom Zeichnen)
         function calculateProjectedCircle(focalLength, maxAperture, lensOffset, fStop, focusInput, filmSize, distOF, apWidth, distSecondOF, secondApWidth) {
             let g = focusInput * 1000;
             let b = (focusInput >= 10.0) ? focalLength : (g * focalLength) / (g - focalLength);
@@ -350,7 +349,6 @@
             ctx.moveTo(lensX, apertureRadius); ctx.lineTo(lensX, lensRadius);
             ctx.stroke();
 
-            // --- COUPLING VIA DETAILED CHECK ---
             const totalDistance = filmX - lensX;
             const progressHelicoid = totalDistance > 0 ? (helicoidX - lensX) / totalDistance : -1;
             const progressFlange = totalDistance > 0 ? (flangeX - lensX) / totalDistance : -1;
@@ -380,6 +378,39 @@
             if (projectedDiameter > filmSize - 0.5 && projectedDiameter < filmSize + 1.0) {
                 projectedDiameter = filmSize;
             }
+
+            // ==========================================
+            // ACCURATE ANALYTICAL VIGNETTING CALCULATION
+            // ==========================================
+            const targetCornerY = filmSize / 2;
+            let irisTop = apertureRadius;
+            let irisBottom = -apertureRadius;
+
+            let helTopFromCorner = irisTop;
+            let helBottomFromCorner = irisBottom;
+            if (progressHelicoid > 0 && progressHelicoid < 1) {
+                let rHel = apWidth / 2;
+                helTopFromCorner = (rHel - progressHelicoid * targetCornerY) / (1 - progressHelicoid);
+                helBottomFromCorner = (-rHel - progressHelicoid * targetCornerY) / (1 - progressHelicoid);
+            }
+
+            let flaTopFromCorner = irisTop;
+            let flaBottomFromCorner = irisBottom;
+            if (progressFlange > 0 && progressFlange < 1) {
+                let rFla = secondApWidth / 2;
+                flaTopFromCorner = (rFla - progressFlange * targetCornerY) / (1 - progressFlange);
+                flaBottomFromCorner = (-rFla - progressFlange * targetCornerY) / (1 - progressFlange);
+            }
+
+            let effectiveTop = Math.min(irisTop, helTopFromCorner, flaTopFromCorner);
+            let effectiveBottom = Math.max(irisBottom, helBottomFromCorner, flaBottomFromCorner);
+
+            let fullIrisWindow = apertureRadius * 2;
+            let effectiveWindow = effectiveTop - effectiveBottom;
+            if (effectiveWindow < 0) effectiveWindow = 0;
+
+            let preciseTransmission = effectiveWindow / fullIrisWindow;
+            let evLoss = preciseTransmission > 0 ? -Math.log2(preciseTransmission) : Infinity;
 
             // Ray-Tracing
             const samplePointsFilm = [-filmSize / 2, 0, filmSize / 2];
@@ -428,19 +459,21 @@
                                        ✓ Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
                                        ✓ Simulated Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
                                        ✓ Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
-                                       ✓ 100% Coverage. No mechanical vignetting!`;
+                                       ✓ 100% Coverage. No mechanical vignetting! (0.00 EV Loss)`;
             } else {
                 statusBox.className = "status-box status-warn";
                 let coveragePercent = Math.min(100, Math.round((projectedDiameter / filmSize) * 100));
+                let evText = evLoss === Infinity ? "Total Blackout (∞ EV)" : `-${evLoss.toFixed(2)} EV`;
+
                 statusBox.innerHTML = `⚠️ Vignetting Detected!${previewMaxAp ? " <b>(Ground Glass Preview Active)</b>" : ""}<br>${formatInfo}
                                        • Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
                                        • Simulated Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
                                        • Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
-                                       • Only approx. ${coveragePercent}% of the required format diagonal is fully illuminated (100% Light).`;
+                                       • Only approx. ${coveragePercent}% of the required format diagonal is fully illuminated.<br>
+                                       • <b>Light loss in extreme corners: <span style="color:#c5221f;">${evText}</span></b>`;
             }
         }
 
-        // KORRIGIERTE OPTIMIERUNGSEINGINE: Nutzt jetzt eine visuelle Iterationssuche (Failsafe bei extremem Linsen-Offset)
         function optimizeFlange() {
             const focalLength = parseFloat(document.getElementById('lensFocal').value) || 105;
             const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
@@ -458,8 +491,6 @@
             let bestDistSecondOF = currentDistSecondOF;
             let foundSolution = false;
 
-            // Wir scannen den mechanisch sinnvollen Bereich von nah am Film (1mm) bis weit weg (200mm)
-            // und suchen die exakte Position, an der der projizierte Kreis maximal ausgeleuchtet ist
             for (let testFlange = 1.0; testFlange <= 200.0; testFlange += 0.1) {
                 let testHelicoid = testFlange + fixedComponentGap;
                 
@@ -471,7 +502,7 @@
                 if (resultCircle >= filmSize) {
                     bestDistSecondOF = testFlange;
                     foundSolution = true;
-                    break; // Erste funktionierende Position von Film aus gesehen ist die kompakteste/beste!
+                    break;
                 }
             }
 
