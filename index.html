@@ -380,7 +380,7 @@
             }
 
             // ==========================================
-            // ACCURATE ANALYTICAL VIGNETTING CALCULATION
+            // MECHANICAL VIGNETTING ACCURATE SENSOR
             // ==========================================
             const targetCornerY = filmSize / 2;
             let irisTop = apertureRadius;
@@ -410,7 +410,19 @@
             if (effectiveWindow < 0) effectiveWindow = 0;
 
             let preciseTransmission = effectiveWindow / fullIrisWindow;
-            let evLoss = preciseTransmission > 0 ? -Math.log2(preciseTransmission) : Infinity;
+            let mechanicalEvLoss = preciseTransmission > 0 ? -Math.log2(preciseTransmission) : Infinity;
+
+            // ==========================================
+            // NEW: NATURAL OPTICAL VIGNETTING (COS⁴ LAW)
+            // ==========================================
+            // Angle alpha between central optical axis and extreme corner field
+            let cornerAngleRad = Math.atan((filmSize / 2) / totalDistance);
+            let cosAlpha = Math.cos(cornerAngleRad);
+            let cos4Transmission = Math.pow(cosAlpha, 4);
+            let cos4EvLoss = -Math.log2(cos4Transmission);
+
+            // Combined True Exposure Loss in the Corner
+            let totalEvLoss = mechanicalEvLoss + cos4EvLoss;
 
             // Ray-Tracing
             const samplePointsFilm = [-filmSize / 2, 0, filmSize / 2];
@@ -446,12 +458,17 @@
 
             // Metrics Output
             const statusBox = document.getElementById('statusBox');
-            let realDist = (filmX - lensX).toFixed(1);
+            let realDist = (totalDistance).toFixed(1);
             let extensionInfo = bellowsExtension > 0 ? `<br>• Bellows Extension: +${bellowsExtension.toFixed(1)} mm` : '';
 
             const formatInfo = `• Required Image Circle: <b>${filmSize.toFixed(1)} mm</b><br>
                                 • Actual Projected Image Circle (100% Light): <b>${projectedDiameter.toFixed(1)} mm</b><br>
                                 • Total Light Circle (Max Limit): <b>${absoluteMaxDiameter.toFixed(1)} mm</b><br><br>`;
+
+            const vignetteMetricsStr = `<br><hr style="border-top:1px dashed rgba(0,0,0,0.1)">
+                                        • Mechanical Vignetting: -${mechanicalEvLoss === Infinity ? "∞" : mechanicalEvLoss.toFixed(2)} EV<br>
+                                        • Cos⁴ Natural Lens Falloff: -${cos4EvLoss.toFixed(2)} EV<br>
+                                        • <b>Total Real-World Corner Loss: <span style="color:#c5221f;">-${totalEvLoss === Infinity ? "∞" : totalEvLoss.toFixed(2)} EV</span></b>`;
 
             if (projectedDiameter >= filmSize) {
                 statusBox.className = "status-box status-ok";
@@ -459,18 +476,18 @@
                                        ✓ Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
                                        ✓ Simulated Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
                                        ✓ Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
-                                       ✓ 100% Coverage. No mechanical vignetting! (0.00 EV Loss)`;
+                                       ✓ 100% Geometric Coverage. No mechanical clipping!
+                                       ${vignetteMetricsStr.replace('color:#c5221f;', 'color:#137333;')}`;
             } else {
                 statusBox.className = "status-box status-warn";
                 let coveragePercent = Math.min(100, Math.round((projectedDiameter / filmSize) * 100));
-                let evText = evLoss === Infinity ? "Total Blackout (∞ EV)" : `-${evLoss.toFixed(2)} EV`;
 
                 statusBox.innerHTML = `⚠️ Vignetting Detected!${previewMaxAp ? " <b>(Ground Glass Preview Active)</b>" : ""}<br>${formatInfo}
                                        • Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
                                        • Simulated Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
                                        • Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
-                                       • Only approx. ${coveragePercent}% of the required format diagonal is fully illuminated.<br>
-                                       • <b>Light loss in extreme corners: <span style="color:#c5221f;">${evText}</span></b>`;
+                                       • Only approx. ${coveragePercent}% of the required format diagonal is fully illuminated.
+                                       ${vignetteMetricsStr}`;
             }
         }
 
