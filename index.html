@@ -63,12 +63,18 @@
         <div class="controls">
             <h2>Controls</h2>
             <div class="credits">Invented by Dragan Bojovic | Programmed by Gemini</div>
-            <p>Accurate separation of lens barrel housing and iris aperture</p>
+            <p>Accurate separation of lens barrel housing and emission aperture</p>
 
             <hr>
+            
+            <label>Flange Focal Distance (FFD / Auflagemaß): <span id="ffdDisplay" class="value-display">99 mm</span></label>
+            <input type="range" id="ffd" min="10" max="300" step="1" value="99">
 
-            <label>Lens Focal Length: <span id="focalDisplay" class="value-display">105 mm</span></label>
-            <input type="range" id="lensFocal" min="10" max="300" step="1" value="105">
+            <label>Lens Focal Length (Brennweite): <span id="focalDisplay" class="value-display">90 mm</span></label>
+            <input type="range" id="lensFocal" min="10" max="300" step="1" value="90">
+
+            <label>Physical Rear Lens Diameter (mm): <span id="rearDiameterDisplay" class="value-display">46 mm</span></label>
+            <input type="range" id="rearDiameter" min="5" max="150" step="1" value="46">
 
             <label>Lens Maximum Aperture:</label>
             <select id="maxAperture">
@@ -82,19 +88,19 @@
                 <option value="3.2">f/3.2</option>
                 <option value="3.5">f/3.5</option>
                 <option value="4">f/4</option>
-                <option value="4.5" selected>f/4.5</option>
+                <option value="4.5">f/4.5</option>
                 <option value="4.8">f/4.8</option>
                 <option value="5">f/5</option>
                 <option value="5.6">f/5.6</option>
                 <option value="6.3">f/6.3</option>
                 <option value="6.8">f/6.8</option>
                 <option value="7.2">f/7.2</option>
-                <option value="8">f/8</option>
+                <option value="8" selected>f/8</option>
                 <option value="9">f/9</option>
             </select>
 
-            <label>Rear Lens Offset to FFD (mm): <span id="offsetDisplay" class="value-display">12 mm</span></label>
-            <input type="range" id="lensOffset" min="-20" max="40" step="0.5" value="5.5">
+            <label>Rear Lens Offset to FFD (mm): <span id="offsetDisplay" class="value-display">30 mm</span></label>
+            <input type="range" id="lensOffset" min="-150" max="150" step="1" value="30">
 
             <hr>
 
@@ -165,7 +171,7 @@
         ];
 
         function updateWorkingApertureDropdown(forcePresetToMax = false) {
-            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
+            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 8;
             const apertureSelect = document.getElementById('aperture');
             const previousValue = parseFloat(apertureSelect.value);
             apertureSelect.innerHTML = ''; 
@@ -185,12 +191,22 @@
             }
         }
 
+        function autoCalcRearDiameter() {
+            const focal = parseFloat(document.getElementById('lensFocal').value);
+            const maxAp = parseFloat(document.getElementById('maxAperture').value);
+            const autoDiameter = Math.round(focal / maxAp);
+            document.getElementById('rearDiameter').value = autoDiameter;
+        }
+
+        document.getElementById('lensFocal').addEventListener('input', autoCalcRearDiameter);
+        document.getElementById('maxAperture').addEventListener('change', autoCalcRearDiameter);
+
         document.getElementById('maxAperture').addEventListener('change', () => {
             updateWorkingApertureDropdown(true); 
             draw();
         });
 
-        const inputs = ['lensFocal', 'lensOffset', 'aperture', 'previewMaxAp', 'focusDistance', 'filmSize', 'distOF', 'apWidth', 'distSecondOF', 'secondApWidth'];
+        const inputs = ['ffd', 'lensFocal', 'rearDiameter', 'lensOffset', 'aperture', 'previewMaxAp', 'focusDistance', 'filmSize', 'distOF', 'apWidth', 'distSecondOF', 'secondApWidth'];
         inputs.forEach(id => {
             document.getElementById(id).addEventListener('input', draw);
             document.getElementById(id).addEventListener('change', draw);
@@ -228,12 +244,17 @@
         }, {passive: true});
         window.addEventListener('touchend', () => isDragging = false);
 
-        function calculateProjectedCircle(focalLength, maxAperture, lensOffset, fStop, focusInput, filmSize, distOF, apWidth, distSecondOF, secondApWidth) {
+        function calculateProjectedCircle(ffd, focalLength, rearDiameter, maxAperture, lensOffset, fStop, focusInput, filmSize, distOF, apWidth, distSecondOF, secondApWidth) {
             let g = focusInput * 1000;
             let b = (focusInput >= 10.0) ? focalLength : (g * focalLength) / (g - focalLength);
             
-            const lensX = filmX - b + lensOffset;
-            const apertureRadius = (focalLength / fStop) / 2;
+            const bellowsExtension = b - focalLength;
+            const ffdNullX = filmX - ffd - bellowsExtension;
+            const lensX = ffdNullX + lensOffset;
+            
+            const physicalRadius = rearDiameter / 2;
+            const emissionRadius = physicalRadius * (maxAperture / fStop);
+
             const helicoidX = filmX - distOF;
             const flangeX = filmX - distSecondOF;
             
@@ -245,13 +266,13 @@
 
             if (progressHelicoid > 0 && progressHelicoid < 1) {
                 let rHel = apWidth / 2;
-                let unvHel = (rHel - apertureRadius * (1 - progressHelicoid)) / progressHelicoid;
+                let unvHel = (rHel - emissionRadius * (1 - progressHelicoid)) / progressHelicoid;
                 if (unvHel < unvignettedRadius) unvignettedRadius = Math.max(0, unvHel);
             }
 
             if (progressFlange > 0 && progressFlange < 1) {
                 let rFla = secondApWidth / 2;
-                let unvFla = (rFla - apertureRadius * (1 - progressFlange)) / progressFlange;
+                let unvFla = (rFla - emissionRadius * (1 - progressFlange)) / progressFlange;
                 if (unvFla < unvignettedRadius) unvignettedRadius = Math.max(0, unvFla);
             }
 
@@ -263,13 +284,21 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            const focalLength = parseFloat(document.getElementById('lensFocal').value) || 105;
-            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
-            const lensOffset = parseFloat(document.getElementById('lensOffset').value);
+            // Standardwerte an neue Vorgaben angepasst
+            const ffd = Math.round(parseFloat(document.getElementById('ffd').value) || 99);
+            const focalLength = Math.round(parseFloat(document.getElementById('lensFocal').value) || 90);
+            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 8;
+            const lensOffset = Math.round(parseFloat(document.getElementById('lensOffset').value) || 30);
             const selectfStop = parseFloat(document.getElementById('aperture').value) || maxAperture;
             const previewMaxAp = document.getElementById('previewMaxAp').checked;
             
+            // Standardwert auf 46mm angepasst
+            const rearDiameter = Math.round(parseFloat(document.getElementById('rearDiameter').value) || 46);
+            const physicalRadius = rearDiameter / 2;
+            
             const fStop = previewMaxAp ? maxAperture : selectfStop;
+
+            const emissionRadius = physicalRadius * (maxAperture / fStop);
 
             const focusInput = parseFloat(document.getElementById('focusDistance').value);
             const filmSize = parseFloat(document.getElementById('filmSize').value);
@@ -278,9 +307,12 @@
             const distSecondOF = parseFloat(document.getElementById('distSecondOF').value) || 39.0;
             const secondApWidth = parseFloat(document.getElementById('secondApWidth').value) || 64.0;
 
+            document.getElementById('ffdDisplay').innerText = `${ffd} mm`;
             document.getElementById('focalDisplay').innerText = `${focalLength} mm`;
+            document.getElementById('rearDiameterDisplay').innerText = `${rearDiameter} mm`;
+            
             const offsetDisplay = document.getElementById('offsetDisplay');
-            if(lensOffset === 0) offsetDisplay.innerText = "0 mm (FFD Plane)";
+            if(lensOffset === 0) offsetDisplay.innerText = "0 mm (Flush with FFD)";
             else if(lensOffset > 0) offsetDisplay.innerText = `${lensOffset} mm behind FFD`;
             else offsetDisplay.innerText = `${Math.abs(lensOffset)} mm in front of FFD`;
 
@@ -296,57 +328,49 @@
             }
 
             const bellowsExtension = b - focalLength; 
-            const ffdNullX = filmX - b; 
+            const ffdNullX = filmX - ffd - bellowsExtension; 
             const lensX = ffdNullX + lensOffset; 
 
             const lensDiameter = focalLength / maxAperture; 
-            const lensRadius = lensDiameter / 2;
-            const apertureRadius = (focalLength / fStop) / 2;
 
             ctx.save();
             ctx.translate(panX, panY);
             ctx.scale(zoom, zoom);
 
-            // Axis
             ctx.strokeStyle = '#333'; ctx.lineWidth = 1 / zoom;
             ctx.beginPath(); ctx.moveTo(-150, 0); ctx.lineTo(filmX + 50, 0); ctx.stroke();
 
             let helicoidX = filmX - distOF;
             let flangeX = filmX - distSecondOF;
 
-            // Helicoid (Red)
             ctx.strokeStyle = "rgba(255, 50, 50, 0.85)"; ctx.lineWidth = 2 / zoom;
             ctx.beginPath();
             ctx.moveTo(helicoidX, -80); ctx.lineTo(helicoidX, -apWidth / 2);
             ctx.moveTo(helicoidX, apWidth / 2); ctx.lineTo(helicoidX, 80);
             ctx.stroke();
 
-            // Flange (Orange)
             ctx.strokeStyle = "rgba(255, 140, 0, 0.85)"; ctx.lineWidth = 2 / zoom;
             ctx.beginPath();
             ctx.moveTo(flangeX, -80); ctx.lineTo(flangeX, -secondApWidth / 2);
             ctx.moveTo(flangeX, secondApWidth / 2); ctx.lineTo(flangeX, 80);
             ctx.stroke();
 
-            // Film (Green)
             ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 2.5 / zoom;
             ctx.beginPath(); ctx.moveTo(filmX, -filmSize / 2); ctx.lineTo(filmX, filmSize / 2); ctx.stroke();
 
-            // FFD Line
             ctx.strokeStyle = "rgba(0, 100, 255, 0.7)"; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([4, 4]);
             ctx.beginPath(); ctx.moveTo(ffdNullX, -50); ctx.lineTo(ffdNullX, 50); ctx.stroke(); ctx.setLineDash([]); 
             ctx.fillStyle = "rgba(0, 140, 255, 1)"; ctx.font = `${10 / zoom}px Arial`;
             ctx.fillText("FFD Plane", ffdNullX + 4, -40);
 
-            // Lens Cell
+            // Physische Linse
             ctx.strokeStyle = "rgba(0, 210, 255, 0.8)"; ctx.lineWidth = 2 / zoom;
-            ctx.beginPath(); ctx.ellipse(lensX, 0, 3, lensRadius, 0, 0, 2 * Math.PI); ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(lensX, 0, 3, physicalRadius, 0, 0, 2 * Math.PI); ctx.stroke();
 
-            // Iris (Yellow)
+            // Iris skaliert mit dem "Emission Radius"
             ctx.strokeStyle = "#ffcc00"; ctx.lineWidth = 3 / zoom;
             ctx.beginPath(); 
-            ctx.moveTo(lensX, -lensRadius); ctx.lineTo(lensX, -apertureRadius);
-            ctx.moveTo(lensX, apertureRadius); ctx.lineTo(lensX, lensRadius);
+            ctx.moveTo(lensX, -emissionRadius); ctx.lineTo(lensX, emissionRadius);
             ctx.stroke();
 
             const totalDistance = filmX - lensX;
@@ -358,16 +382,16 @@
 
             if (progressHelicoid > 0 && progressHelicoid < 1) {
                 let rHel = apWidth / 2;
-                let unvHel = (rHel - apertureRadius * (1 - progressHelicoid)) / progressHelicoid;
-                let totHel = (rHel + apertureRadius * (1 - progressHelicoid)) / progressHelicoid;
+                let unvHel = (rHel - emissionRadius * (1 - progressHelicoid)) / progressHelicoid;
+                let totHel = (rHel + emissionRadius * (1 - progressHelicoid)) / progressHelicoid;
                 if (unvHel < unvignettedRadius) unvignettedRadius = Math.max(0, unvHel);
                 if (totHel < totalLightRadius) totalLightRadius = totHel;
             }
 
             if (progressFlange > 0 && progressFlange < 1) {
                 let rFla = secondApWidth / 2;
-                let unvFla = (rFla - apertureRadius * (1 - progressFlange)) / progressFlange;
-                let totFla = (rFla + apertureRadius * (1 - progressFlange)) / progressFlange;
+                let unvFla = (rFla - emissionRadius * (1 - progressFlange)) / progressFlange;
+                let totFla = (rFla + emissionRadius * (1 - progressFlange)) / progressFlange;
                 if (unvFla < unvignettedRadius) unvignettedRadius = Math.max(0, unvFla);
                 if (totFla < totalLightRadius) totalLightRadius = totFla;
             }
@@ -379,12 +403,10 @@
                 projectedDiameter = filmSize;
             }
 
-            // ==========================================
             // MECHANICAL VIGNETTING ACCURATE SENSOR
-            // ==========================================
             const targetCornerY = filmSize / 2;
-            let irisTop = apertureRadius;
-            let irisBottom = -apertureRadius;
+            let irisTop = emissionRadius;
+            let irisBottom = -emissionRadius;
 
             let helTopFromCorner = irisTop;
             let helBottomFromCorner = irisBottom;
@@ -405,23 +427,19 @@
             let effectiveTop = Math.min(irisTop, helTopFromCorner, flaTopFromCorner);
             let effectiveBottom = Math.max(irisBottom, helBottomFromCorner, flaBottomFromCorner);
 
-            let fullIrisWindow = apertureRadius * 2;
+            let fullIrisWindow = emissionRadius * 2;
             let effectiveWindow = effectiveTop - effectiveBottom;
             if (effectiveWindow < 0) effectiveWindow = 0;
 
             let preciseTransmission = effectiveWindow / fullIrisWindow;
             let mechanicalEvLoss = preciseTransmission > 0 ? -Math.log2(preciseTransmission) : Infinity;
 
-            // ==========================================
-            // NEW: NATURAL OPTICAL VIGNETTING (COS⁴ LAW)
-            // ==========================================
-            // Angle alpha between central optical axis and extreme corner field
+            // NATURAL OPTICAL VIGNETTING (COS⁴ LAW)
             let cornerAngleRad = Math.atan((filmSize / 2) / totalDistance);
             let cosAlpha = Math.cos(cornerAngleRad);
             let cos4Transmission = Math.pow(cosAlpha, 4);
             let cos4EvLoss = -Math.log2(cos4Transmission);
 
-            // Combined True Exposure Loss in the Corner
             let totalEvLoss = mechanicalEvLoss + cos4EvLoss;
 
             // Ray-Tracing
@@ -430,7 +448,7 @@
 
             samplePointsFilm.forEach(targetFilmY => {
                 for (let a = 0; a < raysPerPoint; a++) {
-                    let startLensY = -apertureRadius + (a * ((apertureRadius * 2) / (raysPerPoint - 1)));
+                    let startLensY = -emissionRadius + (a * ((emissionRadius * 2) / (raysPerPoint - 1)));
 
                     let yAtHelicoid = startLensY + progressHelicoid * (targetFilmY - startLensY);
                     let yAtFlange = startLensY + progressFlange * (targetFilmY - startLensY);
@@ -456,10 +474,18 @@
             });
             ctx.restore();
 
-            // Metrics Output
             const statusBox = document.getElementById('statusBox');
             let realDist = (totalDistance).toFixed(1);
             let extensionInfo = bellowsExtension > 0 ? `<br>• Bellows Extension: +${bellowsExtension.toFixed(1)} mm` : '';
+
+            let hasMechanicalCollision = false;
+            let collisionWarning = "";
+            if (rearDiameter > apWidth || rearDiameter > secondApWidth) {
+                hasMechanicalCollision = true;
+                collisionWarning = `<div style="background:#fce8e6; border:1px solid #c5221f; color:#c5221f; padding:8px; margin-bottom:10px; border-radius:4px;"><b>⚠️ MECHANISCHE KOLLISION:</b> Dein Tubus (${rearDiameter}mm) passt nicht durch die Öffnung!</div>`;
+            } else {
+                collisionWarning = `<div style="color:#137333; margin-bottom:10px;">✓ Physischer Fit: Tubus (${rearDiameter}mm) passt.</div>`;
+            }
 
             const formatInfo = `• Required Image Circle: <b>${filmSize.toFixed(1)} mm</b><br>
                                 • Actual Projected Image Circle (100% Light): <b>${projectedDiameter.toFixed(1)} mm</b><br>
@@ -470,11 +496,11 @@
                                         • Cos⁴ Natural Lens Falloff: -${cos4EvLoss.toFixed(2)} EV<br>
                                         • <b>Total Real-World Corner Loss: <span style="color:#c5221f;">-${totalEvLoss === Infinity ? "∞" : totalEvLoss.toFixed(2)} EV</span></b>`;
 
-            if (projectedDiameter >= filmSize) {
+            if (projectedDiameter >= filmSize && !hasMechanicalCollision) {
                 statusBox.className = "status-box status-ok";
-                statusBox.innerHTML = `Frankenstein Simulator Status:${previewMaxAp ? " <b>(Ground Glass Preview Active)</b>" : ""}<br>${formatInfo}
-                                       ✓ Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
-                                       ✓ Simulated Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
+                statusBox.innerHTML = `${collisionWarning}Frankenstein Simulator Status:${previewMaxAp ? " <b>(Ground Glass Preview Active)</b>" : ""}<br>${formatInfo}
+                                       ✓ Max Lens Speed (Optical equivalent): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
+                                       ✓ Simulated Emission Profile: Ø ${(emissionRadius*2).toFixed(1)} mm<br>
                                        ✓ Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
                                        ✓ 100% Geometric Coverage. No mechanical clipping!
                                        ${vignetteMetricsStr.replace('color:#c5221f;', 'color:#137333;')}`;
@@ -482,9 +508,9 @@
                 statusBox.className = "status-box status-warn";
                 let coveragePercent = Math.min(100, Math.round((projectedDiameter / filmSize) * 100));
 
-                statusBox.innerHTML = `⚠️ Vignetting Detected!${previewMaxAp ? " <b>(Ground Glass Preview Active)</b>" : ""}<br>${formatInfo}
-                                       • Max Lens Speed (Physical): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
-                                       • Simulated Iris: f/${fStop} (Ø ${(apertureRadius*2).toFixed(1)} mm)<br>
+                statusBox.innerHTML = `${collisionWarning}⚠️ Vignetting Detected!${previewMaxAp ? " <b>(Ground Glass Preview Active)</b>" : ""}<br>${formatInfo}
+                                       • Max Lens Speed (Optical equivalent): f/${maxAperture} (Ø ${lensDiameter.toFixed(1)} mm)<br>
+                                       • Simulated Emission Profile: Ø ${(emissionRadius*2).toFixed(1)} mm<br>
                                        • Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
                                        • Only approx. ${coveragePercent}% of the required format diagonal is fully illuminated.
                                        ${vignetteMetricsStr}`;
@@ -492,12 +518,15 @@
         }
 
         function optimizeFlange() {
-            const focalLength = parseFloat(document.getElementById('lensFocal').value) || 105;
-            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
+            const ffd = parseFloat(document.getElementById('ffd').value) || 99;
+            const focalLength = parseFloat(document.getElementById('lensFocal').value) || 90;
+            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 8;
             const filmSize = parseFloat(document.getElementById('filmSize').value);
             const focusInput = parseFloat(document.getElementById('focusDistance').value);
             const lensOffset = parseFloat(document.getElementById('lensOffset').value) || 0;
             
+            const rearDiameter = parseFloat(document.getElementById('rearDiameter').value) || Math.round(focalLength / maxAperture);
+
             const apWidth = parseFloat(document.getElementById('apWidth').value) || 61.0;
             const secondApWidth = parseFloat(document.getElementById('secondApWidth').value) || 64.0;
             
@@ -512,7 +541,7 @@
                 let testHelicoid = testFlange + fixedComponentGap;
                 
                 let resultCircle = calculateProjectedCircle(
-                    focalLength, maxAperture, lensOffset, maxAperture, 
+                    ffd, focalLength, rearDiameter, maxAperture, lensOffset, maxAperture, 
                     focusInput, filmSize, testHelicoid, apWidth, testFlange, secondApWidth
                 );
 
