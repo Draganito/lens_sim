@@ -674,6 +674,12 @@
             const ffd = parseFloat(document.getElementById('ffd').value) || 101;
             const focalLength = parseFloat(document.getElementById('lensFocal').value) || 105;
             const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
+            
+            // Holt die aktuell eingestellte Arbeitsblende und prüft den Preview-Haken
+            const selectfStop = parseFloat(document.getElementById('aperture').value) || maxAperture;
+            const previewMaxAp = document.getElementById('previewMaxAp').checked;
+            const activeAperture = previewMaxAp ? maxAperture : selectfStop;
+            
             const filmSize = parseFloat(document.getElementById('filmSize').value);
             const focusInput = parseFloat(document.getElementById('focusDistance').value);
             
@@ -696,7 +702,7 @@
                 let testHelicoid = testFlange + fixedComponentGap;
                 
                 let resultCircle = calculateProjectedCircle(
-                    ffd, focalLength, rearDiameter, maxAperture, lensOffset, maxAperture, 
+                    ffd, focalLength, rearDiameter, maxAperture, lensOffset, activeAperture, 
                     focusInput, filmSize, testHelicoid, apWidth, testFlange, secondApWidth
                 );
 
