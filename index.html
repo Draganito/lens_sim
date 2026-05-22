@@ -46,6 +46,21 @@
             transition: background 0.2s;
         }
         .btn-optimize:hover { background-color: #0056b3; }
+
+        .btn-reset {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 0.95em;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            transition: background 0.2s;
+        }
+        .btn-reset:hover { background-color: #5a6268; }
     </style>
 </head>
 <body>
@@ -146,6 +161,7 @@
             <input type="number" id="secondApWidth" value="64.0" step="0.5">
 
             <button type="button" class="btn-optimize" onclick="optimizeFlange()">Optimize Flange & Helicoid for 100% Light</button>
+            <button type="button" class="btn-reset" onclick="resetToDefaults()">Reset to Default Settings</button>
         </div>
     </div>
 
@@ -264,6 +280,33 @@
                     }
                 }
             }
+        }
+
+        function resetToDefaults() {
+            // Werte exakt auf die Standardvorgaben zurücksetzen
+            document.getElementById('ffd').value = 101;
+            document.getElementById('lensFocal').value = 105;
+            document.getElementById('rearDiameter').value = 23;
+            document.getElementById('maxAperture').value = "4.5";
+            document.getElementById('lensOffset').value = 3;
+            
+            // Dropdown muss nach Ändern der maxAperture neu generiert werden
+            updateWorkingApertureDropdown(true); 
+            
+            document.getElementById('previewMaxAp').checked = false;
+            document.getElementById('focusDistance').value = 1.0;
+            document.getElementById('coc').value = 0.030;
+            document.getElementById('filmSize').value = "94.8";
+            
+            document.getElementById('distOF').value = 41.5;
+            document.getElementById('apWidth').value = 61.0;
+            document.getElementById('distSecondOF').value = 39.0;
+            document.getElementById('secondApWidth').value = 64.0;
+            
+            // Ansicht zentrieren, URL bereinigen und neu zeichnen
+            resetCentering();
+            updateURL();
+            draw();
         }
 
         // Event Listeners
@@ -406,8 +449,6 @@
             const lensDiameter = focalLength / maxAperture; 
 
             // --- OPTIK BERECHNUNGEN (DoF & Diffraction) ---
-            // Wir berechnen die Schärfentiefe immer mit der Arbeitsblende (selectfStop),
-            // da dies das finale Foto widerspiegelt, selbst wenn der Preview-Modus an ist.
             let H = (focalLength * focalLength) / (selectfStop * coc) + focalLength; // Hyperfokaldistanz
             let dNear, dFar;
 
