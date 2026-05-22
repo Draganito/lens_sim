@@ -67,14 +67,14 @@
 
             <hr>
             
-            <label>Flange Focal Distance (FFD / Auflagemaß): <span id="ffdDisplay" class="value-display">99 mm</span></label>
-            <input type="range" id="ffd" min="10" max="300" step="1" value="99">
+            <label>Flange Focal Distance (FFD / Auflagemaß): <span id="ffdDisplay" class="value-display">101 mm</span></label>
+            <input type="range" id="ffd" min="10" max="300" step="1" value="101">
 
-            <label>Lens Focal Length (Brennweite): <span id="focalDisplay" class="value-display">90 mm</span></label>
-            <input type="range" id="lensFocal" min="10" max="300" step="1" value="90">
+            <label>Lens Focal Length (Brennweite): <span id="focalDisplay" class="value-display">105 mm</span></label>
+            <input type="range" id="lensFocal" min="10" max="300" step="1" value="105">
 
-            <label>Physical Rear Lens Diameter (mm): <span id="rearDiameterDisplay" class="value-display">46 mm</span></label>
-            <input type="range" id="rearDiameter" min="5" max="150" step="1" value="46">
+            <label>Physical Rear Lens Diameter (mm): <span id="rearDiameterDisplay" class="value-display">23 mm</span></label>
+            <input type="range" id="rearDiameter" min="5" max="150" step="1" value="23">
 
             <label>Lens Maximum Aperture:</label>
             <select id="maxAperture">
@@ -88,19 +88,19 @@
                 <option value="3.2">f/3.2</option>
                 <option value="3.5">f/3.5</option>
                 <option value="4">f/4</option>
-                <option value="4.5">f/4.5</option>
+                <option value="4.5" selected>f/4.5</option>
                 <option value="4.8">f/4.8</option>
                 <option value="5">f/5</option>
                 <option value="5.6">f/5.6</option>
                 <option value="6.3">f/6.3</option>
                 <option value="6.8">f/6.8</option>
                 <option value="7.2">f/7.2</option>
-                <option value="8" selected>f/8</option>
+                <option value="8">f/8</option>
                 <option value="9">f/9</option>
             </select>
 
-            <label>Rear Lens Offset to FFD (mm): <span id="offsetDisplay" class="value-display">30 mm</span></label>
-            <input type="range" id="lensOffset" min="-150" max="150" step="1" value="30">
+            <label>Rear Lens Offset to FFD (mm): <span id="offsetDisplay" class="value-display">3 mm</span></label>
+            <input type="range" id="lensOffset" min="0" max="150" step="1" value="3">
 
             <hr>
 
@@ -112,8 +112,11 @@
             </label>
             
             <hr>
-            <label>Focus Distance: <span id="focusDistDisplay" class="value-display">Infinity</span></label>
-            <input type="range" id="focusDistance" min="0.5" max="10.0" step="0.1" value="10.0">
+            <label>Focus Distance: <span id="focusDistDisplay" class="value-display">1.0 m</span></label>
+            <input type="range" id="focusDistance" min="0.5" max="10.0" step="0.1" value="1.0">
+
+            <label>Circle of Confusion (CoC in mm): <span id="cocDisplay" class="value-display">0.030 mm</span></label>
+            <input type="number" id="coc" min="0.001" max="0.1" step="0.001" value="0.030">
 
             <hr>
             
@@ -121,8 +124,8 @@
             <select id="filmSize">
                 <option value="79.2">6x6 (56x56 mm, 79.2 mm Diagonal)</option>
                 <option value="89.4">6x7 (56x69.5 mm, 89.4 mm Diagonal)</option>
-                <option value="94.8">6x8 (56x76 mm, 94.8 mm Diagonal)</option>
-                <option value="99.2" selected>6x9 (56x81.5 mm, 99.2 mm Diagonal)</option>
+                <option value="94.8" selected>6x8 (56x76 mm, 94.8 mm Diagonal)</option>
+                <option value="99.2">6x9 (56x81.5 mm, 99.2 mm Diagonal)</option>
                 <option value="162.9">4x5 inch (102x127 mm, 162.9 mm Diagonal)</option>
             </select>
 
@@ -158,6 +161,24 @@
         let panX = 0;
         let panY = 0;
 
+        // URL Parameter Mapping
+        const paramMap = {
+            'ffd': 'ffd',
+            'lensFocal': 'focal',
+            'rearDiameter': 'rearDiam',
+            'maxAperture': 'maxAp',
+            'lensOffset': 'offset',
+            'aperture': 'workAp',
+            'previewMaxAp': 'preview',
+            'focusDistance': 'focus',
+            'coc': 'coc',
+            'filmSize': 'film',
+            'distOF': 'dOF',
+            'apWidth': 'apW',
+            'distSecondOF': 'dSOF',
+            'secondApWidth': 'sApW'
+        };
+
         function resetCentering() {
             const systemMidX = 340;
             const systemMidY = 0;
@@ -171,7 +192,7 @@
         ];
 
         function updateWorkingApertureDropdown(forcePresetToMax = false) {
-            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 8;
+            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
             const apertureSelect = document.getElementById('aperture');
             const previousValue = parseFloat(apertureSelect.value);
             apertureSelect.innerHTML = ''; 
@@ -196,22 +217,72 @@
             const maxAp = parseFloat(document.getElementById('maxAperture').value);
             const autoDiameter = Math.round(focal / maxAp);
             document.getElementById('rearDiameter').value = autoDiameter;
+            updateURL();
         }
 
+        // URL Functions
+        function updateURL() {
+            const params = new URLSearchParams(window.location.search);
+            for (const [id, param] of Object.entries(paramMap)) {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') {
+                        params.set(param, el.checked);
+                    } else {
+                        params.set(param, el.value);
+                    }
+                }
+            }
+            const newUrl = `${window.location.pathname}?${params.toString()}`;
+            window.history.replaceState({}, '', newUrl);
+        }
+
+        function loadSettingsFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.toString() === "") {
+                updateWorkingApertureDropdown(true);
+                return;
+            }
+
+            // Set max aperture first so the dropdown generates correctly
+            if (params.has('maxAp')) {
+                document.getElementById('maxAperture').value = params.get('maxAp');
+            }
+            
+            updateWorkingApertureDropdown();
+
+            for (const [id, param] of Object.entries(paramMap)) {
+                if (id === 'maxAperture') continue; // already handled
+                if (params.has(param)) {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        if (el.type === 'checkbox') {
+                            el.checked = (params.get(param) === 'true');
+                        } else {
+                            el.value = params.get(param);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Event Listeners
         document.getElementById('lensFocal').addEventListener('input', autoCalcRearDiameter);
         document.getElementById('maxAperture').addEventListener('change', autoCalcRearDiameter);
 
         document.getElementById('maxAperture').addEventListener('change', () => {
             updateWorkingApertureDropdown(true); 
+            updateURL();
             draw();
         });
 
-        const inputs = ['ffd', 'lensFocal', 'rearDiameter', 'lensOffset', 'aperture', 'previewMaxAp', 'focusDistance', 'filmSize', 'distOF', 'apWidth', 'distSecondOF', 'secondApWidth'];
+        const inputs = ['ffd', 'lensFocal', 'rearDiameter', 'lensOffset', 'aperture', 'previewMaxAp', 'focusDistance', 'coc', 'filmSize', 'distOF', 'apWidth', 'distSecondOF', 'secondApWidth'];
         inputs.forEach(id => {
-            document.getElementById(id).addEventListener('input', draw);
-            document.getElementById(id).addEventListener('change', draw);
+            document.getElementById(id).addEventListener('input', () => { updateURL(); draw(); });
+            document.getElementById(id).addEventListener('change', () => { updateURL(); draw(); });
         });
 
+        // Canvas Interaction
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             const wheel = e.deltaY < 0 ? 1.1 : 0.9;
@@ -284,24 +355,26 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Standardwerte an neue Vorgaben angepasst
-            const ffd = Math.round(parseFloat(document.getElementById('ffd').value) || 99);
-            const focalLength = Math.round(parseFloat(document.getElementById('lensFocal').value) || 90);
-            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 8;
-            const lensOffset = Math.round(parseFloat(document.getElementById('lensOffset').value) || 30);
+            const ffd = Math.round(parseFloat(document.getElementById('ffd').value) || 101);
+            const focalLength = Math.round(parseFloat(document.getElementById('lensFocal').value) || 105);
+            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
+            
+            let rawOffset = parseFloat(document.getElementById('lensOffset').value);
+            const lensOffset = isNaN(rawOffset) ? 3 : Math.round(rawOffset);
+            
             const selectfStop = parseFloat(document.getElementById('aperture').value) || maxAperture;
             const previewMaxAp = document.getElementById('previewMaxAp').checked;
             
-            // Standardwert auf 46mm angepasst
-            const rearDiameter = Math.round(parseFloat(document.getElementById('rearDiameter').value) || 46);
+            const rearDiameter = Math.round(parseFloat(document.getElementById('rearDiameter').value) || 23);
             const physicalRadius = rearDiameter / 2;
             
             const fStop = previewMaxAp ? maxAperture : selectfStop;
 
             const emissionRadius = physicalRadius * (maxAperture / fStop);
 
-            const focusInput = parseFloat(document.getElementById('focusDistance').value);
-            const filmSize = parseFloat(document.getElementById('filmSize').value);
+            const focusInput = parseFloat(document.getElementById('focusDistance').value) || 1.0;
+            const coc = parseFloat(document.getElementById('coc').value) || 0.03;
+            const filmSize = parseFloat(document.getElementById('filmSize').value) || 94.8;
             const distOF = parseFloat(document.getElementById('distOF').value) || 41.5;
             const apWidth = parseFloat(document.getElementById('apWidth').value) || 61.0;
             const distSecondOF = parseFloat(document.getElementById('distSecondOF').value) || 39.0;
@@ -310,11 +383,11 @@
             document.getElementById('ffdDisplay').innerText = `${ffd} mm`;
             document.getElementById('focalDisplay').innerText = `${focalLength} mm`;
             document.getElementById('rearDiameterDisplay').innerText = `${rearDiameter} mm`;
+            document.getElementById('cocDisplay').innerText = `${coc.toFixed(3)} mm`;
             
             const offsetDisplay = document.getElementById('offsetDisplay');
             if(lensOffset === 0) offsetDisplay.innerText = "0 mm (Flush with FFD)";
-            else if(lensOffset > 0) offsetDisplay.innerText = `${lensOffset} mm behind FFD`;
-            else offsetDisplay.innerText = `${Math.abs(lensOffset)} mm in front of FFD`;
+            else offsetDisplay.innerText = `${lensOffset} mm behind FFD`;
 
             let g = focusInput * 1000; 
             let b = focalLength;       
@@ -330,8 +403,36 @@
             const bellowsExtension = b - focalLength; 
             const ffdNullX = filmX - ffd - bellowsExtension; 
             const lensX = ffdNullX + lensOffset; 
-
             const lensDiameter = focalLength / maxAperture; 
+
+            // --- OPTIK BERECHNUNGEN (DoF & Diffraction) ---
+            // Wir berechnen die Schärfentiefe immer mit der Arbeitsblende (selectfStop),
+            // da dies das finale Foto widerspiegelt, selbst wenn der Preview-Modus an ist.
+            let H = (focalLength * focalLength) / (selectfStop * coc) + focalLength; // Hyperfokaldistanz
+            let dNear, dFar;
+
+            if (focusInput >= 10.0) {
+                dNear = H;
+                dFar = Infinity;
+            } else {
+                dNear = (g * (H - focalLength)) / (H + g - 2 * focalLength);
+                if (g >= H) {
+                    dFar = Infinity;
+                } else {
+                    dFar = (g * (H - focalLength)) / (H - g);
+                }
+            }
+
+            let dNearStr = (dNear / 1000).toFixed(2) + " m";
+            let dFarStr = dFar === Infinity ? "Infinity (∞)" : (dFar / 1000).toFixed(2) + " m";
+            let dofTotalStr = dFar === Infinity ? "Infinity" : ((dFar - dNear) / 1000).toFixed(2) + " m";
+
+            // Effektive Blende wegen Auszug (Magnification)
+            let magnification = bellowsExtension / focalLength;
+            let effectiveAperture = selectfStop * (1 + magnification);
+            
+            // Theoretische lp/mm nach Rayleigh (Grünes Licht ~550nm)
+            let lpmm = 1490 / effectiveAperture;
 
             ctx.save();
             ctx.translate(panX, panY);
@@ -495,6 +596,15 @@
                                         • Mechanical Vignetting: -${mechanicalEvLoss === Infinity ? "∞" : mechanicalEvLoss.toFixed(2)} EV<br>
                                         • Cos⁴ Natural Lens Falloff: -${cos4EvLoss.toFixed(2)} EV<br>
                                         • <b>Total Real-World Corner Loss: <span style="color:#c5221f;">-${totalEvLoss === Infinity ? "∞" : totalEvLoss.toFixed(2)} EV</span></b>`;
+                                        
+            const opticsMetricsStr = `<br><hr style="border-top:1px dashed rgba(0,0,0,0.1)">
+                                      <b>Depth of Field (DoF) @ f/${selectfStop}:</b><br>
+                                      • Near Limit: ${dNearStr}<br>
+                                      • Far Limit: ${dFarStr}<br>
+                                      • Total Range: <b>${dofTotalStr}</b><br><br>
+                                      <b>Diffraction & Resolution @ f/${selectfStop}:</b><br>
+                                      • Effective Aperture (Macro): f/${effectiveAperture.toFixed(1)}<br>
+                                      • Theoretical Max Resolution: <b>~${lpmm.toFixed(0)} lp/mm</b>`;
 
             if (projectedDiameter >= filmSize && !hasMechanicalCollision) {
                 statusBox.className = "status-box status-ok";
@@ -503,7 +613,8 @@
                                        ✓ Simulated Emission Profile: Ø ${(emissionRadius*2).toFixed(1)} mm<br>
                                        ✓ Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
                                        ✓ 100% Geometric Coverage. No mechanical clipping!
-                                       ${vignetteMetricsStr.replace('color:#c5221f;', 'color:#137333;')}`;
+                                       ${vignetteMetricsStr.replace('color:#c5221f;', 'color:#137333;')}
+                                       ${opticsMetricsStr}`;
             } else {
                 statusBox.className = "status-box status-warn";
                 let coveragePercent = Math.min(100, Math.round((projectedDiameter / filmSize) * 100));
@@ -513,17 +624,20 @@
                                        • Simulated Emission Profile: Ø ${(emissionRadius*2).toFixed(1)} mm<br>
                                        • Lens-to-Film: ${realDist} mm ${extensionInfo}<br>
                                        • Only approx. ${coveragePercent}% of the required format diagonal is fully illuminated.
-                                       ${vignetteMetricsStr}`;
+                                       ${vignetteMetricsStr}
+                                       ${opticsMetricsStr}`;
             }
         }
 
         function optimizeFlange() {
-            const ffd = parseFloat(document.getElementById('ffd').value) || 99;
-            const focalLength = parseFloat(document.getElementById('lensFocal').value) || 90;
-            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 8;
+            const ffd = parseFloat(document.getElementById('ffd').value) || 101;
+            const focalLength = parseFloat(document.getElementById('lensFocal').value) || 105;
+            const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
             const filmSize = parseFloat(document.getElementById('filmSize').value);
             const focusInput = parseFloat(document.getElementById('focusDistance').value);
-            const lensOffset = parseFloat(document.getElementById('lensOffset').value) || 0;
+            
+            let rawOffset = parseFloat(document.getElementById('lensOffset').value);
+            const lensOffset = isNaN(rawOffset) ? 3 : rawOffset;
             
             const rearDiameter = parseFloat(document.getElementById('rearDiameter').value) || Math.round(focalLength / maxAperture);
 
@@ -555,14 +669,17 @@
             if (foundSolution) {
                 document.getElementById('distSecondOF').value = bestDistSecondOF.toFixed(1);
                 document.getElementById('distOF').value = (bestDistSecondOF + fixedComponentGap).toFixed(1);
+                updateURL();
                 draw(); 
             } else {
                 alert("100% light coverage is mechanically impossible with this layout! Increase the internal barrel diameters or pick a smaller film format.");
             }
         }
 
+        // Initialization
         resetCentering();
-        updateWorkingApertureDropdown(true);
+        loadSettingsFromURL();
+        updateURL(); // Ensure URL immediately reflects the applied settings
         draw();
     </script>
 </body>
