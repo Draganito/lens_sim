@@ -12,7 +12,7 @@ https://draganito.github.io/lens_sim/
 
 ## 📖 About the Project
 
-This simulator was originally developed as an engineering tool during the creation of the **Miluka** – a custom medium-format camera utilizing M65 helicoids and Graflok 23 standard backs (compatible with Mamiya RB67 6x8, 6x9, or sheet film). 
+This simulator was originally developed as an engineering tool during the creation of the **miluka** – a custom medium-format camera utilizing M65 helicoids and Graflok 23 standard backs (compatible with Mamiya RB67 6x8, 6x9, or sheet film). 
 
 Building "Frankenstein" cameras (combining vintage lenses with custom 3D-printed/CNC bodies) often involves heavy trial-and-error, especially regarding mechanical clearance, flange focal distance (FFD), and unexpected vignetting. This tool solves those issues by simulating the optical and physical realities directly in your browser.
 
