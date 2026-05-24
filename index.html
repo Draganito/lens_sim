@@ -25,7 +25,7 @@
         .checkbox-container { display: flex; align-items: center; gap: 10px; margin: 15px 0; font-weight: bold; font-size: 0.95em; cursor: pointer; }
         .checkbox-container input { width: auto; cursor: pointer; }
 
-        /* 3D Viewport statt Canvas */
+        /* 3D Viewport instead of Canvas */
         #viewport { background: #111; border: 1px solid #ddd; border-radius: 4px; width: 100%; height: 500px; display: block; position: relative; overflow: hidden;}
         
         p { color: #666; font-size: 0.8em; margin: 8px 0; }
@@ -53,8 +53,7 @@
         <div class="canvas-container">
             <h2>Frankenstein Simulator 3D</h2>
             
-            <div id="viewport">
-                </div>
+            <div id="viewport"></div>
 
             <div id="statusBox" class="status-box status-ok">
                 Optical Status: Calculating...
@@ -68,7 +67,7 @@
 
             <hr>
             
-            <label>Flange Focal Distance (FFD / Auflagemaß): <span id="ffdDisplay" class="value-display">101 mm</span></label>
+            <label>Flange Focal Distance (FFD): <span id="ffdDisplay" class="value-display">101 mm</span></label>
             <input type="range" id="ffd" min="10" max="300" step="1" value="101">
 
             <label>Lens Board / Shutter Hole (FFD Plane):</label>
@@ -79,7 +78,7 @@
                 <option value="52.5">Compur #2 (52.5 mm)</option>
             </select>
 
-            <label>Lens Focal Length (Brennweite): <span id="focalDisplay" class="value-display">105 mm</span></label>
+            <label>Lens Focal Length: <span id="focalDisplay" class="value-display">105 mm</span></label>
             <input type="range" id="lensFocal" min="10" max="300" step="1" value="105">
 
             <label>Physical Rear Lens Diameter (mm): <span id="rearDiameterDisplay" class="value-display">23 mm</span></label>
@@ -127,6 +126,9 @@
             <label>Circle of Confusion (CoC in mm): <span id="cocDisplay" class="value-display">0.030 mm</span></label>
             <input type="number" id="coc" min="0.001" max="0.1" step="0.001" value="0.030">
 
+            <label>Registration Error (Film vs. Mattscheibe): <span id="regErrorDisplay" class="value-display">0.100 mm</span></label>
+            <input type="number" id="regError" min="0" max="2.0" step="0.01" value="0.10">
+
             <hr>
             
             <label>Cone Diameter Film Plane (mm):</label>
@@ -164,7 +166,7 @@
         const paramMap = {
             'ffd': 'ffd', 'shutterSize': 'shutter', 'lensFocal': 'focal', 'rearDiameter': 'rearDiam', 'maxAperture': 'maxAp',
             'lensOffset': 'offset', 'aperture': 'workAp', 'previewMaxAp': 'preview', 'focusDistance': 'focus',
-            'coc': 'coc', 'filmSize': 'film', 'distOF': 'dOF', 'apWidth': 'apW', 'distSecondOF': 'dSOF', 'secondApWidth': 'sApW'
+            'coc': 'coc', 'regError': 'regErr', 'filmSize': 'film', 'distOF': 'dOF', 'apWidth': 'apW', 'distSecondOF': 'dSOF', 'secondApWidth': 'sApW'
         };
 
         const fullApertureList = [
@@ -172,7 +174,7 @@
             6.3, 6.8, 7.2, 8, 9, 9.5, 11, 12.5, 16, 18, 22, 25, 32, 36, 45, 50, 64, 68, 71, 88
         ];
 
-        // --- 3D ENGINE INITIALISIERUNG ---
+        // --- 3D ENGINE INITIALIZATION ---
         let scene, camera, renderer, controls;
         let objGroup;
         let meshes = {}; 
@@ -237,7 +239,7 @@
             objGroup.add(mesh);
         }
 
-        // --- ORIGINAL FUNKTIONEN ---
+        // --- ORIGINAL FUNCTIONS ---
         function updateWorkingApertureDropdown(forcePresetToMax = false) {
             const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
             const apertureSelect = document.getElementById('aperture');
@@ -313,6 +315,7 @@
             document.getElementById('previewMaxAp').checked = false;
             document.getElementById('focusDistance').value = 1.0;
             document.getElementById('coc').value = 0.030;
+            document.getElementById('regError').value = 0.10;
             document.getElementById('filmSize').value = "94.8";
             document.getElementById('distOF').value = 41.5;
             document.getElementById('apWidth').value = 61.0;
@@ -326,7 +329,7 @@
             draw();
         }
 
-        // --- HIER WIRD DIE 3D SZENE GEZEICHNET & BERECHNET ---
+        // --- 3D SCENE RENDERING & MATH ---
         function draw() {
             const ffd = Math.round(parseFloat(document.getElementById('ffd').value) || 101);
             const focalLength = Math.round(parseFloat(document.getElementById('lensFocal').value) || 105);
@@ -345,6 +348,8 @@
 
             const focusInput = parseFloat(document.getElementById('focusDistance').value) || 1.0;
             const coc = parseFloat(document.getElementById('coc').value) || 0.03;
+            const regError = Math.abs(parseFloat(document.getElementById('regError').value) || 0);
+
             const filmSize = parseFloat(document.getElementById('filmSize').value) || 94.8;
             const distOF = parseFloat(document.getElementById('distOF').value) || 41.5;
             const apWidth = parseFloat(document.getElementById('apWidth').value) || 61.0;
@@ -356,6 +361,7 @@
             document.getElementById('focalDisplay').innerText = `${focalLength} mm`;
             document.getElementById('rearDiameterDisplay').innerText = `${rearDiameter} mm`;
             document.getElementById('cocDisplay').innerText = `${coc.toFixed(3)} mm`;
+            document.getElementById('regErrorDisplay').innerText = `${regError.toFixed(3)} mm`;
             
             const offsetDisplay = document.getElementById('offsetDisplay');
             if(lensOffset === 0) offsetDisplay.innerText = "0 mm (Flush with FFD)";
@@ -383,7 +389,7 @@
             const helicoidZ = -distOF;
             const flangeZ = -distSecondOF;
 
-            // --- OPTIK BERECHNUNGEN (DoF & Diffraction) ---
+            // --- OPTICS CALCULATIONS (DoF & Diffraction & Depth of Focus) ---
             let H = (focalLength * focalLength) / (selectfStop * coc) + focalLength;
             let dNear, dFar;
 
@@ -400,9 +406,25 @@
             let dFarStr = dFar === Infinity ? "Infinity (∞)" : (dFar / 1000).toFixed(2) + " m";
             let dofTotalStr = dFar === Infinity ? "Infinity" : ((dFar - dNear) / 1000).toFixed(2) + " m";
 
+            // Effective Aperture & Diffraction
             let magnification = bellowsExtension / focalLength;
             let effectiveAperture = selectfStop * (1 + magnification);
             let lpmm = 1490 / effectiveAperture;
+
+            // Tolerance at Film Plane
+            let depthOfFocusTotal = 2 * effectiveAperture * coc;
+            let depthOfFocusTolerance = depthOfFocusTotal / 2;
+
+            // --- NEW: CALCULATION OF RESOLUTION LOSS DUE TO REGISTRATION ERROR ---
+            // 1. Geometric blur circle diameter caused by focus offset
+            let blurDefocus = regError / effectiveAperture;
+            // 2. Blur circle equivalent of the diffraction limit
+            let blurDiffraction = 1 / lpmm;
+            // 3. Combine blurs using Root-Sum-Square (RSS) method
+            let totalBlur = Math.sqrt(Math.pow(blurDefocus, 2) + Math.pow(blurDiffraction, 2));
+            // 4. Remaining effective resolution
+            let remainingLpmm = 1 / totalBlur;
+
 
             // --- VIGNETTING MATH (PENUMBRA / UMBRA) ---
             const progressHelicoid = totalDistance > 0 ? (helicoidZ - lensZ) / totalDistance : -1;
@@ -434,7 +456,6 @@
                 projectedDiameter = filmSize;
             }
 
-            // Radien für das visuelle Rendering limitieren
             let rInner = unvignettedRadius === Infinity ? (filmSize * 1.5) : unvignettedRadius;
             let rOuter = totalLightRadius === Infinity ? (filmSize * 1.5) : totalLightRadius;
             rInner = Math.max(0, rInner);
@@ -481,7 +502,6 @@
 
             // --- 3D RENDERING ---
 
-            // 1. Film Ebene mit dynamischer Textur (Rot für Vignettierung, Gradient für Halbschatten, Grün für Licht)
             if (meshes.film) {
                 objGroup.remove(meshes.film);
                 meshes.film.geometry.dispose();
@@ -507,15 +527,14 @@
                 tCtx.fillStyle = '#00ff00';
                 tCtx.fillRect(0, 0, texCanvas.width, texCanvas.height);
             } else {
-                // Roter Hintergrund (0% Licht / Abgeschnitten)
                 tCtx.fillStyle = '#ff2222';
                 tCtx.fillRect(0, 0, texCanvas.width, texCanvas.height);
 
                 if (pxOuter > 0) {
-                    let safePxOuter = Math.max(pxOuter, pxInner + 0.1); // Verhindert Canvas Fehler bei identischen Radien
+                    let safePxOuter = Math.max(pxOuter, pxInner + 0.1);
                     const grad = tCtx.createRadialGradient(cx, cy, pxInner, cx, cy, safePxOuter);
-                    grad.addColorStop(0, 'rgba(0, 255, 0, 1)');       // 100% Ausleuchtung (Grün)
-                    grad.addColorStop(1, 'rgba(255, 34, 34, 0)');     // Weicher Übergang in den roten Hintergrund
+                    grad.addColorStop(0, 'rgba(0, 255, 0, 1)'); 
+                    grad.addColorStop(1, 'rgba(255, 34, 34, 0)');
                     
                     tCtx.fillStyle = grad;
                     tCtx.beginPath();
@@ -537,7 +556,6 @@
             meshes.film.add(line);
             objGroup.add(meshes.film);
 
-            // 2. FFD Ebene (Lens Board mit Compur-Loch)
             if (meshes.ffdPlane) objGroup.remove(meshes.ffdPlane);
             
             let ffdWidth = filmWidth * 1.2;
@@ -565,11 +583,9 @@
             meshes.ffdPlane.add(ffdLine);
             objGroup.add(meshes.ffdPlane);
 
-            // 3. Ringe (Wände simulieren mit großen Outer-Radii)
             createRing('helicoid', helicoidZ, apWidth, apWidth + 40, 0xff3333);
             createRing('flange', flangeZ, secondApWidth, secondApWidth + 40, 0xff8c00);
 
-            // 4. Linse & Emission Aperture
             if (meshes.lens) objGroup.remove(meshes.lens);
             const lensGeo = new THREE.CircleGeometry(physicalRadius, 32);
             const lensMat = new THREE.MeshBasicMaterial({ color: 0x00d2ff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
@@ -583,11 +599,8 @@
             meshes.lens.add(irisMesh);
             objGroup.add(meshes.lens);
 
-            // 5. Lichtkegel (Äußerer Halbschatten-Kegel entfernt für visuelle Klarheit)
             if (meshes.light) { objGroup.remove(meshes.light); meshes.light.geometry.dispose(); meshes.light.material.dispose(); }
-            if (meshes.lightOuter) { objGroup.remove(meshes.lightOuter); meshes.lightOuter.geometry.dispose(); meshes.lightOuter.material.dispose(); meshes.lightOuter = null; }
             
-            // Nur noch der Kernschatten-Kegel (100% Licht) wird in 3D gezeichnet
             const coneGeoInner = new THREE.CylinderGeometry(rInner, emissionRadius, totalDistance, 32, 1, true);
             const coneMatInner = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
             meshes.light = new THREE.Mesh(coneGeoInner, coneMatInner);
@@ -605,9 +618,9 @@
             let collisionWarning = "";
             if (rearDiameter > apWidth || rearDiameter > secondApWidth) {
                 hasMechanicalCollision = true;
-                collisionWarning = `<div style="background:#fce8e6; border:1px solid #c5221f; color:#c5221f; padding:8px; margin-bottom:10px; border-radius:4px;"><b>⚠️ MECHANISCHE KOLLISION:</b> Dein Tubus (${rearDiameter}mm) passt nicht durch die Helicoid-Öffnung!</div>`;
+                collisionWarning = `<div style="background:#fce8e6; border:1px solid #c5221f; color:#c5221f; padding:8px; margin-bottom:10px; border-radius:4px;"><b>⚠️ MECHANICAL COLLISION:</b> Your lens barrel (${rearDiameter}mm) does not fit through the helicoid/flange opening!</div>`;
             } else {
-                collisionWarning = `<div style="color:#137333; margin-bottom:10px;">✓ Physischer Fit: Tubus (${rearDiameter}mm) passt durch Helicoid/Flange.</div>`;
+                collisionWarning = `<div style="color:#137333; margin-bottom:10px;">✓ Physical Fit: Lens barrel (${rearDiameter}mm) clears the helicoid/flange opening.</div>`;
             }
 
             const formatInfo = `• Required Image Circle: <b>${filmSize.toFixed(1)} mm</b><br>
@@ -618,15 +631,31 @@
                                         • Mechanical Vignetting: -${mechanicalEvLoss === Infinity ? "∞" : mechanicalEvLoss.toFixed(2)} EV<br>
                                         • Cos⁴ Natural Lens Falloff: -${cos4EvLoss.toFixed(2)} EV<br>
                                         • <b>Total Real-World Corner Loss: <span style="color:#c5221f;">-${totalEvLoss === Infinity ? "∞" : totalEvLoss.toFixed(2)} EV</span></b>`;
-                                        
+            
+            // Format Resolution Output Based on Error Severity
+            let resolutionOutput = `<b>~${remainingLpmm.toFixed(0)} lp/mm</b>`;
+            if (remainingLpmm < 30) {
+                resolutionOutput = `<span style="color:#c5221f;"><b>~${remainingLpmm.toFixed(0)} lp/mm (CRITICAL BLUR)</b></span>`;
+            } else if (remainingLpmm < 45) {
+                resolutionOutput = `<span style="color:#b06000;"><b>~${remainingLpmm.toFixed(0)} lp/mm (Soft)</b></span>`;
+            } else {
+                resolutionOutput = `<span style="color:#137333;"><b>~${remainingLpmm.toFixed(0)} lp/mm (Sharp)</b></span>`;
+            }
+
             const opticsMetricsStr = `<br><hr style="border-top:1px dashed rgba(0,0,0,0.1)">
                                       <b>Depth of Field (DoF) @ f/${selectfStop}:</b><br>
                                       • Near Limit: ${dNearStr}<br>
                                       • Far Limit: ${dFarStr}<br>
                                       • Total Range: <b>${dofTotalStr}</b><br><br>
-                                      <b>Diffraction & Resolution @ f/${selectfStop}:</b><br>
-                                      • Effective Aperture (Macro): f/${effectiveAperture.toFixed(1)}<br>
-                                      • Theoretical Max Resolution: <b>~${lpmm.toFixed(0)} lp/mm</b>`;
+                                      
+                                      <b>Depth of Focus (Film Plane Tolerance):</b><br>
+                                      • Safe Zone (based on CoC): <b>± ${depthOfFocusTolerance.toFixed(3)} mm</b><br>
+                                      • Total Spread: ${depthOfFocusTotal.toFixed(3)} mm<br><br>
+                                      
+                                      <b>Diffraction & Registration Error Resolution @ f/${selectfStop}:</b><br>
+                                      • Perfect Focus Max Resolution: ~${lpmm.toFixed(0)} lp/mm (Diffraction Limit)<br>
+                                      • Blur from ${regError.toFixed(3)}mm Error: Ø ${blurDefocus.toFixed(3)} mm<br>
+                                      • <b>Actual Resolution (incl. Error): ${resolutionOutput}</b>`;
 
             if (projectedDiameter >= filmSize && !hasMechanicalCollision) {
                 statusBox.className = "status-box status-ok";
@@ -651,7 +680,7 @@
             }
         }
 
-        // --- OPTIMIERUNGS-FUNKTION (Original) ---
+        // --- OPTIMIZATION FUNCTION (Original) ---
         function calculateProjectedCircle(ffd, focalLength, rearDiameter, maxAperture, lensOffset, fStop, focusInput, filmSize, distOF, apWidth, distSecondOF, secondApWidth) {
             let g = focusInput * 1000;
             let b = (focusInput >= 10.0) ? focalLength : (g * focalLength) / (g - focalLength);
@@ -737,7 +766,7 @@
             draw();
         });
 
-        const inputs = ['ffd', 'shutterSize', 'lensFocal', 'rearDiameter', 'lensOffset', 'aperture', 'previewMaxAp', 'focusDistance', 'coc', 'filmSize', 'distOF', 'apWidth', 'distSecondOF', 'secondApWidth'];
+        const inputs = ['ffd', 'shutterSize', 'lensFocal', 'rearDiameter', 'lensOffset', 'aperture', 'previewMaxAp', 'focusDistance', 'coc', 'regError', 'filmSize', 'distOF', 'apWidth', 'distSecondOF', 'secondApWidth'];
         inputs.forEach(id => {
             document.getElementById(id).addEventListener('input', () => { updateURL(); draw(); });
             document.getElementById(id).addEventListener('change', () => { updateURL(); draw(); });
