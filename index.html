@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Frankenstein Camera Simulator - by Dragan Bojovic</title>
+    <title>Frankenstein Camera Simulator 3D - by Dragan Bojovic</title>
+    <!-- Three.js Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 10px; background-color: #f4f4f4; }
         .container { display: flex; flex-direction: column; gap: 20px; max-width: 1200px; margin: 0 auto; }
@@ -22,7 +26,9 @@
         .checkbox-container { display: flex; align-items: center; gap: 10px; margin: 15px 0; font-weight: bold; font-size: 0.95em; cursor: pointer; }
         .checkbox-container input { width: auto; cursor: pointer; }
 
-        canvas { background: #111; border: 1px solid #ddd; border-radius: 4px; width: 100%; height: auto; display: block; }
+        /* 3D Viewport statt Canvas */
+        #viewport { background: #111; border: 1px solid #ddd; border-radius: 4px; width: 100%; height: 500px; display: block; position: relative; overflow: hidden;}
+        
         p { color: #666; font-size: 0.8em; margin: 8px 0; }
         hr { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
         
@@ -33,32 +39,12 @@
         .credits { font-size: 0.85em; color: #888; font-style: italic; margin-top: -5px; margin-bottom: 15px; }
 
         .btn-optimize {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            font-size: 0.95em;
-            font-weight: bold;
-            border-radius: 4px;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 15px;
-            transition: background 0.2s;
+            background-color: #007bff; color: white; border: none; padding: 10px 15px; font-size: 0.95em; font-weight: bold; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 15px; transition: background 0.2s;
         }
         .btn-optimize:hover { background-color: #0056b3; }
 
         .btn-reset {
-            background-color: #6c757d;
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            font-size: 0.95em;
-            font-weight: bold;
-            border-radius: 4px;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 10px;
-            transition: background 0.2s;
+            background-color: #6c757d; color: white; border: none; padding: 10px 15px; font-size: 0.95em; font-weight: bold; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; transition: background 0.2s;
         }
         .btn-reset:hover { background-color: #5a6268; }
     </style>
@@ -66,9 +52,11 @@
 <body>
     <div class="container">
         <div class="canvas-container">
-            <h2>Frankenstein Simulator</h2>
-            <canvas id="canvas" width="800" height="500"></canvas>
-            <p>Desktop: Wheel = Zoom, Drag = Pan | Mobile: Pinch/Swipe</p>
+            <h2>Frankenstein Simulator 3D</h2>
+            
+            <div id="viewport">
+                <!-- Text-Overlays wurden entfernt -->
+            </div>
 
             <div id="statusBox" class="status-box status-ok">
                 Optical Status: Calculating...
@@ -77,13 +65,21 @@
 
         <div class="controls">
             <h2>Controls</h2>
-            <div class="credits">Invented by Dragan Bojovic | Programmed by Gemini</div>
+            <div class="credits">Invented by Dragan Bojovic | 3D Simulation Engine</div>
             <p>Accurate separation of lens barrel housing and emission aperture</p>
 
             <hr>
             
             <label>Flange Focal Distance (FFD / Auflagemaß): <span id="ffdDisplay" class="value-display">101 mm</span></label>
             <input type="range" id="ffd" min="10" max="300" step="1" value="101">
+
+            <label>Lens Board / Shutter Hole (FFD Plane):</label>
+            <select id="shutterSize">
+                <option value="26.3">Compur #00 (26.3 mm)</option>
+                <option value="34.6" selected>Compur #0 (34.6 mm)</option>
+                <option value="41.6">Compur #1 (41.6 mm)</option>
+                <option value="52.5">Compur #2 (52.5 mm)</option>
+            </select>
 
             <label>Lens Focal Length (Brennweite): <span id="focalDisplay" class="value-display">105 mm</span></label>
             <input type="range" id="lensFocal" min="10" max="300" step="1" value="105">
@@ -166,47 +162,84 @@
     </div>
 
     <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-
-        let zoom = 2.2; 
-        let isDragging = false;
-        let lastX, lastY;
-
-        const filmX = 400; 
-        let panX = 0;
-        let panY = 0;
-
-        // URL Parameter Mapping
+        // --- URL Parameter Mapping ---
         const paramMap = {
-            'ffd': 'ffd',
-            'lensFocal': 'focal',
-            'rearDiameter': 'rearDiam',
-            'maxAperture': 'maxAp',
-            'lensOffset': 'offset',
-            'aperture': 'workAp',
-            'previewMaxAp': 'preview',
-            'focusDistance': 'focus',
-            'coc': 'coc',
-            'filmSize': 'film',
-            'distOF': 'dOF',
-            'apWidth': 'apW',
-            'distSecondOF': 'dSOF',
-            'secondApWidth': 'sApW'
+            'ffd': 'ffd', 'shutterSize': 'shutter', 'lensFocal': 'focal', 'rearDiameter': 'rearDiam', 'maxAperture': 'maxAp',
+            'lensOffset': 'offset', 'aperture': 'workAp', 'previewMaxAp': 'preview', 'focusDistance': 'focus',
+            'coc': 'coc', 'filmSize': 'film', 'distOF': 'dOF', 'apWidth': 'apW', 'distSecondOF': 'dSOF', 'secondApWidth': 'sApW'
         };
-
-        function resetCentering() {
-            const systemMidX = 340;
-            const systemMidY = 0;
-            panX = (canvas.width / 2) - (systemMidX * zoom);
-            panY = (canvas.height / 2) - (systemMidY * zoom);
-        }
 
         const fullApertureList = [
             1, 1.2, 1.4, 1.8, 2, 2.7, 2.8, 3.2, 3.5, 4, 4.5, 4.8, 5, 5.6, 
             6.3, 6.8, 7.2, 8, 9, 9.5, 11, 12.5, 16, 18, 22, 25, 32, 36, 45, 50, 64, 68, 71, 88
         ];
 
+        // --- 3D ENGINE INITIALISIERUNG ---
+        let scene, camera, renderer, controls;
+        let objGroup;
+        let meshes = {}; 
+
+        function init3D() {
+            const container = document.getElementById('viewport');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111111);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 2000);
+            camera.position.set(150, 100, 150); 
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(0, 0, -50); 
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight.position.set(50, 100, 50);
+            scene.add(dirLight);
+
+            const gridHelper = new THREE.GridHelper(400, 40, 0x444444, 0x222222);
+            gridHelper.position.y = -60;
+            scene.add(gridHelper);
+
+            objGroup = new THREE.Group();
+            scene.add(objGroup);
+
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+
+            animate3D();
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function createRing(id, zPos, innerDiam, outerDiam, colorHex) {
+            if (meshes[id]) {
+                objGroup.remove(meshes[id]);
+                meshes[id].geometry.dispose();
+                meshes[id].material.dispose();
+            }
+            const geo = new THREE.RingGeometry(innerDiam/2, outerDiam/2, 64);
+            const mat = new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.z = zPos;
+            meshes[id] = mesh;
+            objGroup.add(mesh);
+        }
+
+        // --- ORIGINAL FUNKTIONEN ---
         function updateWorkingApertureDropdown(forcePresetToMax = false) {
             const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
             const apertureSelect = document.getElementById('aperture');
@@ -236,17 +269,13 @@
             updateURL();
         }
 
-        // URL Functions
         function updateURL() {
             const params = new URLSearchParams(window.location.search);
             for (const [id, param] of Object.entries(paramMap)) {
                 const el = document.getElementById(id);
                 if (el) {
-                    if (el.type === 'checkbox') {
-                        params.set(param, el.checked);
-                    } else {
-                        params.set(param, el.value);
-                    }
+                    if (el.type === 'checkbox') params.set(param, el.checked);
+                    else params.set(param, el.value);
                 }
             }
             const newUrl = `${window.location.pathname}?${params.toString()}`;
@@ -260,144 +289,47 @@
                 return;
             }
 
-            // Set max aperture first so the dropdown generates correctly
-            if (params.has('maxAp')) {
-                document.getElementById('maxAperture').value = params.get('maxAp');
-            }
-            
+            if (params.has('maxAp')) document.getElementById('maxAperture').value = params.get('maxAp');
             updateWorkingApertureDropdown();
 
             for (const [id, param] of Object.entries(paramMap)) {
-                if (id === 'maxAperture') continue; // already handled
+                if (id === 'maxAperture') continue;
                 if (params.has(param)) {
                     const el = document.getElementById(id);
                     if (el) {
-                        if (el.type === 'checkbox') {
-                            el.checked = (params.get(param) === 'true');
-                        } else {
-                            el.value = params.get(param);
-                        }
+                        if (el.type === 'checkbox') el.checked = (params.get(param) === 'true');
+                        else el.value = params.get(param);
                     }
                 }
             }
         }
 
         function resetToDefaults() {
-            // Werte exakt auf die Standardvorgaben zurücksetzen
             document.getElementById('ffd').value = 101;
+            document.getElementById('shutterSize').value = "34.6";
             document.getElementById('lensFocal').value = 105;
             document.getElementById('rearDiameter').value = 23;
             document.getElementById('maxAperture').value = "4.5";
             document.getElementById('lensOffset').value = 3;
-            
-            // Dropdown muss nach Ändern der maxAperture neu generiert werden
             updateWorkingApertureDropdown(true); 
-            
             document.getElementById('previewMaxAp').checked = false;
             document.getElementById('focusDistance').value = 1.0;
             document.getElementById('coc').value = 0.030;
             document.getElementById('filmSize').value = "94.8";
-            
             document.getElementById('distOF').value = 41.5;
             document.getElementById('apWidth').value = 61.0;
             document.getElementById('distSecondOF').value = 39.0;
             document.getElementById('secondApWidth').value = 64.0;
             
-            // Ansicht zentrieren, URL bereinigen und neu zeichnen
-            resetCentering();
+            controls.target.set(0, 0, -50);
+            camera.position.set(150, 100, 150);
+            
             updateURL();
             draw();
         }
 
-        // Event Listeners
-        document.getElementById('lensFocal').addEventListener('input', autoCalcRearDiameter);
-        document.getElementById('maxAperture').addEventListener('change', autoCalcRearDiameter);
-
-        document.getElementById('maxAperture').addEventListener('change', () => {
-            updateWorkingApertureDropdown(true); 
-            updateURL();
-            draw();
-        });
-
-        const inputs = ['ffd', 'lensFocal', 'rearDiameter', 'lensOffset', 'aperture', 'previewMaxAp', 'focusDistance', 'coc', 'filmSize', 'distOF', 'apWidth', 'distSecondOF', 'secondApWidth'];
-        inputs.forEach(id => {
-            document.getElementById(id).addEventListener('input', () => { updateURL(); draw(); });
-            document.getElementById(id).addEventListener('change', () => { updateURL(); draw(); });
-        });
-
-        // Canvas Interaction
-        canvas.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            const wheel = e.deltaY < 0 ? 1.1 : 0.9;
-            zoom = Math.max(0.3, Math.min(zoom * wheel, 30));
-            draw();
-        });
-        canvas.addEventListener('mousedown', (e) => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
-        canvas.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            panX += (e.clientX - lastX);
-            panY += (e.clientY - lastY);
-            lastX = e.clientX; lastY = e.clientY;
-            draw();
-        });
-        window.addEventListener('mouseup', () => isDragging = false);
-
-        canvas.addEventListener('touchstart', (e) => {
-            if (e.touches.length === 1) {
-                isDragging = true;
-                lastX = e.touches[0].clientX;
-                lastY = e.touches[0].clientY;
-            }
-        }, {passive: true});
-        canvas.addEventListener('touchmove', (e) => {
-            if (!isDragging || e.touches.length !== 1) return;
-            panX += (e.touches[0].clientX - lastX);
-            panY += (e.touches[0].clientY - lastY);
-            lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
-            draw();
-        }, {passive: true});
-        window.addEventListener('touchend', () => isDragging = false);
-
-        function calculateProjectedCircle(ffd, focalLength, rearDiameter, maxAperture, lensOffset, fStop, focusInput, filmSize, distOF, apWidth, distSecondOF, secondApWidth) {
-            let g = focusInput * 1000;
-            let b = (focusInput >= 10.0) ? focalLength : (g * focalLength) / (g - focalLength);
-            
-            const bellowsExtension = b - focalLength;
-            const ffdNullX = filmX - ffd - bellowsExtension;
-            const lensX = ffdNullX + lensOffset;
-            
-            const physicalRadius = rearDiameter / 2;
-            const emissionRadius = physicalRadius * (maxAperture / fStop);
-
-            const helicoidX = filmX - distOF;
-            const flangeX = filmX - distSecondOF;
-            
-            const totalDistance = filmX - lensX;
-            const progressHelicoid = totalDistance > 0 ? (helicoidX - lensX) / totalDistance : -1;
-            const progressFlange = totalDistance > 0 ? (flangeX - lensX) / totalDistance : -1;
-
-            let unvignettedRadius = Infinity;
-
-            if (progressHelicoid > 0 && progressHelicoid < 1) {
-                let rHel = apWidth / 2;
-                let unvHel = (rHel - emissionRadius * (1 - progressHelicoid)) / progressHelicoid;
-                if (unvHel < unvignettedRadius) unvignettedRadius = Math.max(0, unvHel);
-            }
-
-            if (progressFlange > 0 && progressFlange < 1) {
-                let rFla = secondApWidth / 2;
-                let unvFla = (rFla - emissionRadius * (1 - progressFlange)) / progressFlange;
-                if (unvFla < unvignettedRadius) unvignettedRadius = Math.max(0, unvFla);
-            }
-
-            let projDiam = unvignettedRadius === Infinity ? filmSize : unvignettedRadius * 2;
-            if (projDiam > filmSize - 0.5 && projDiam < filmSize + 1.0) projDiam = filmSize;
-            return projDiam;
-        }
-
+        // --- HIER WIRD DIE 3D SZENE GEZEICHNET & BERECHNET ---
         function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             const ffd = Math.round(parseFloat(document.getElementById('ffd').value) || 101);
             const focalLength = Math.round(parseFloat(document.getElementById('lensFocal').value) || 105);
             const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
@@ -410,9 +342,7 @@
             
             const rearDiameter = Math.round(parseFloat(document.getElementById('rearDiameter').value) || 23);
             const physicalRadius = rearDiameter / 2;
-            
             const fStop = previewMaxAp ? maxAperture : selectfStop;
-
             const emissionRadius = physicalRadius * (maxAperture / fStop);
 
             const focusInput = parseFloat(document.getElementById('focusDistance').value) || 1.0;
@@ -422,6 +352,7 @@
             const apWidth = parseFloat(document.getElementById('apWidth').value) || 61.0;
             const distSecondOF = parseFloat(document.getElementById('distSecondOF').value) || 39.0;
             const secondApWidth = parseFloat(document.getElementById('secondApWidth').value) || 64.0;
+            const shutterSizeVal = document.getElementById('shutterSize').value;
 
             document.getElementById('ffdDisplay').innerText = `${ffd} mm`;
             document.getElementById('focalDisplay').innerText = `${focalLength} mm`;
@@ -444,12 +375,18 @@
             }
 
             const bellowsExtension = b - focalLength; 
-            const ffdNullX = filmX - ffd - bellowsExtension; 
-            const lensX = ffdNullX + lensOffset; 
+            
+            const filmZ = 0;
+            const ffdNullZ = -(ffd + bellowsExtension); 
+            const lensZ = ffdNullZ + lensOffset; 
             const lensDiameter = focalLength / maxAperture; 
 
+            const totalDistance = Math.abs(lensZ);
+            const helicoidZ = -distOF;
+            const flangeZ = -distSecondOF;
+
             // --- OPTIK BERECHNUNGEN (DoF & Diffraction) ---
-            let H = (focalLength * focalLength) / (selectfStop * coc) + focalLength; // Hyperfokaldistanz
+            let H = (focalLength * focalLength) / (selectfStop * coc) + focalLength;
             let dNear, dFar;
 
             if (focusInput >= 10.0) {
@@ -457,70 +394,24 @@
                 dFar = Infinity;
             } else {
                 dNear = (g * (H - focalLength)) / (H + g - 2 * focalLength);
-                if (g >= H) {
-                    dFar = Infinity;
-                } else {
-                    dFar = (g * (H - focalLength)) / (H - g);
-                }
+                if (g >= H) dFar = Infinity;
+                else dFar = (g * (H - focalLength)) / (H - g);
             }
 
             let dNearStr = (dNear / 1000).toFixed(2) + " m";
             let dFarStr = dFar === Infinity ? "Infinity (∞)" : (dFar / 1000).toFixed(2) + " m";
             let dofTotalStr = dFar === Infinity ? "Infinity" : ((dFar - dNear) / 1000).toFixed(2) + " m";
 
-            // Effektive Blende wegen Auszug (Magnification)
             let magnification = bellowsExtension / focalLength;
             let effectiveAperture = selectfStop * (1 + magnification);
-            
-            // Theoretische lp/mm nach Rayleigh (Grünes Licht ~550nm)
             let lpmm = 1490 / effectiveAperture;
 
-            ctx.save();
-            ctx.translate(panX, panY);
-            ctx.scale(zoom, zoom);
+            // --- VIGNETTING MATH (PENUMBRA / UMBRA) ---
+            const progressHelicoid = totalDistance > 0 ? (helicoidZ - lensZ) / totalDistance : -1;
+            const progressFlange = totalDistance > 0 ? (flangeZ - lensZ) / totalDistance : -1;
 
-            ctx.strokeStyle = '#333'; ctx.lineWidth = 1 / zoom;
-            ctx.beginPath(); ctx.moveTo(-150, 0); ctx.lineTo(filmX + 50, 0); ctx.stroke();
-
-            let helicoidX = filmX - distOF;
-            let flangeX = filmX - distSecondOF;
-
-            ctx.strokeStyle = "rgba(255, 50, 50, 0.85)"; ctx.lineWidth = 2 / zoom;
-            ctx.beginPath();
-            ctx.moveTo(helicoidX, -80); ctx.lineTo(helicoidX, -apWidth / 2);
-            ctx.moveTo(helicoidX, apWidth / 2); ctx.lineTo(helicoidX, 80);
-            ctx.stroke();
-
-            ctx.strokeStyle = "rgba(255, 140, 0, 0.85)"; ctx.lineWidth = 2 / zoom;
-            ctx.beginPath();
-            ctx.moveTo(flangeX, -80); ctx.lineTo(flangeX, -secondApWidth / 2);
-            ctx.moveTo(flangeX, secondApWidth / 2); ctx.lineTo(flangeX, 80);
-            ctx.stroke();
-
-            ctx.strokeStyle = "#00ff00"; ctx.lineWidth = 2.5 / zoom;
-            ctx.beginPath(); ctx.moveTo(filmX, -filmSize / 2); ctx.lineTo(filmX, filmSize / 2); ctx.stroke();
-
-            ctx.strokeStyle = "rgba(0, 100, 255, 0.7)"; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([4, 4]);
-            ctx.beginPath(); ctx.moveTo(ffdNullX, -50); ctx.lineTo(ffdNullX, 50); ctx.stroke(); ctx.setLineDash([]); 
-            ctx.fillStyle = "rgba(0, 140, 255, 1)"; ctx.font = `${10 / zoom}px Arial`;
-            ctx.fillText("FFD Plane", ffdNullX + 4, -40);
-
-            // Physische Linse
-            ctx.strokeStyle = "rgba(0, 210, 255, 0.8)"; ctx.lineWidth = 2 / zoom;
-            ctx.beginPath(); ctx.ellipse(lensX, 0, 3, physicalRadius, 0, 0, 2 * Math.PI); ctx.stroke();
-
-            // Iris skaliert mit dem "Emission Radius"
-            ctx.strokeStyle = "#ffcc00"; ctx.lineWidth = 3 / zoom;
-            ctx.beginPath(); 
-            ctx.moveTo(lensX, -emissionRadius); ctx.lineTo(lensX, emissionRadius);
-            ctx.stroke();
-
-            const totalDistance = filmX - lensX;
-            const progressHelicoid = totalDistance > 0 ? (helicoidX - lensX) / totalDistance : -1;
-            const progressFlange = totalDistance > 0 ? (flangeX - lensX) / totalDistance : -1;
-
-            let unvignettedRadius = Infinity;
-            let totalLightRadius = Infinity;
+            let unvignettedRadius = Infinity;  // Inner circle: 100% Light
+            let totalLightRadius = Infinity;   // Outer circle: 0% Light Limit
 
             if (progressHelicoid > 0 && progressHelicoid < 1) {
                 let rHel = apWidth / 2;
@@ -545,7 +436,13 @@
                 projectedDiameter = filmSize;
             }
 
-            // MECHANICAL VIGNETTING ACCURATE SENSOR
+            // Radien für das visuelle Rendering limitieren
+            let rInner = unvignettedRadius === Infinity ? (filmSize * 1.5) : unvignettedRadius;
+            let rOuter = totalLightRadius === Infinity ? (filmSize * 1.5) : totalLightRadius;
+            rInner = Math.max(0, rInner);
+            rOuter = Math.max(0, rOuter);
+
+            // MECHANICAL VIGNETTING EV LOSS (Corner Calculation)
             const targetCornerY = filmSize / 2;
             let irisTop = emissionRadius;
             let irisBottom = -emissionRadius;
@@ -581,41 +478,137 @@
             let cosAlpha = Math.cos(cornerAngleRad);
             let cos4Transmission = Math.pow(cosAlpha, 4);
             let cos4EvLoss = -Math.log2(cos4Transmission);
-
             let totalEvLoss = mechanicalEvLoss + cos4EvLoss;
 
-            // Ray-Tracing
-            const samplePointsFilm = [-filmSize / 2, 0, filmSize / 2];
-            const raysPerPoint = 11; 
 
-            samplePointsFilm.forEach(targetFilmY => {
-                for (let a = 0; a < raysPerPoint; a++) {
-                    let startLensY = -emissionRadius + (a * ((emissionRadius * 2) / (raysPerPoint - 1)));
+            // --- 3D RENDERING ---
 
-                    let yAtHelicoid = startLensY + progressHelicoid * (targetFilmY - startLensY);
-                    let yAtFlange = startLensY + progressFlange * (targetFilmY - startLensY);
+            // 1. Film Ebene mit dynamischer Textur (Rot für Vignettierung, Gradient für Halbschatten, Grün für Licht)
+            if (meshes.film) {
+                objGroup.remove(meshes.film);
+                meshes.film.geometry.dispose();
+                if (meshes.film.material.map) meshes.film.material.map.dispose();
+                meshes.film.material.dispose();
+            }
+            
+            let filmWidth = filmSize * 0.8; 
+            let filmHeight = filmSize * 0.6;
 
-                    let isBlocked = false;
-                    if (progressHelicoid > 0 && progressHelicoid < 1 && Math.abs(yAtHelicoid) > apWidth / 2) isBlocked = true;
-                    if (progressFlange > 0 && progressFlange < 1 && Math.abs(yAtFlange) > secondApWidth / 2) isBlocked = true;
+            const texCanvas = document.createElement('canvas');
+            texCanvas.width = 1024;
+            texCanvas.height = Math.round(1024 * (filmHeight / filmWidth));
+            const tCtx = texCanvas.getContext('2d');
+            const mmToPx = texCanvas.width / filmWidth;
+            
+            let pxInner = rInner * mmToPx;
+            let pxOuter = rOuter * mmToPx;
+            let cx = texCanvas.width / 2;
+            let cy = texCanvas.height / 2;
 
-                    ctx.beginPath();
-                    ctx.moveTo(lensX, startLensY);
-                    if (isBlocked) {
-                        ctx.strokeStyle = "rgba(255, 50, 50, 0.12)"; 
-                        let isHelicoidBlock = (progressHelicoid > 0 && progressHelicoid < 1 && Math.abs(yAtHelicoid) > apWidth / 2);
-                        let blockX = isHelicoidBlock ? helicoidX : flangeX;
-                        let blockY = isHelicoidBlock ? yAtHelicoid : yAtFlange;
-                        ctx.lineTo(blockX, blockY);
-                    } else {
-                        ctx.strokeStyle = "rgba(255, 255, 255, 0.35)"; 
-                        ctx.lineTo(filmX, targetFilmY);
-                    }
-                    ctx.stroke();
+            if (unvignettedRadius === Infinity) {
+                tCtx.fillStyle = '#00ff00';
+                tCtx.fillRect(0, 0, texCanvas.width, texCanvas.height);
+            } else {
+                // Roter Hintergrund (0% Licht / Abgeschnitten)
+                tCtx.fillStyle = '#ff2222';
+                tCtx.fillRect(0, 0, texCanvas.width, texCanvas.height);
+
+                if (pxOuter > 0) {
+                    let safePxOuter = Math.max(pxOuter, pxInner + 0.1); // Verhindert Canvas Fehler bei identischen Radien
+                    const grad = tCtx.createRadialGradient(cx, cy, pxInner, cx, cy, safePxOuter);
+                    grad.addColorStop(0, 'rgba(0, 255, 0, 1)');       // 100% Ausleuchtung (Grün)
+                    grad.addColorStop(1, 'rgba(255, 34, 34, 0)');     // Weicher Übergang in den roten Hintergrund
+                    
+                    tCtx.fillStyle = grad;
+                    tCtx.beginPath();
+                    tCtx.arc(cx, cy, safePxOuter, 0, Math.PI * 2);
+                    tCtx.fill();
                 }
-            });
-            ctx.restore();
+            }
 
+            const filmTex = new THREE.CanvasTexture(texCanvas);
+            if(renderer.capabilities.getMaxAnisotropy) filmTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+            const filmGeo = new THREE.PlaneGeometry(filmWidth, filmHeight);
+            const filmMat = new THREE.MeshBasicMaterial({ map: filmTex, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
+            meshes.film = new THREE.Mesh(filmGeo, filmMat);
+            meshes.film.position.z = filmZ;
+            
+            const edges = new THREE.EdgesGeometry(filmGeo);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xcccccc }));
+            meshes.film.add(line);
+            objGroup.add(meshes.film);
+
+            // 2. FFD Ebene (Lens Board mit Compur-Loch)
+            if (meshes.ffdPlane) objGroup.remove(meshes.ffdPlane);
+            
+            let ffdWidth = filmWidth * 1.2;
+            let ffdHeight = filmHeight * 1.2;
+            let holeRadius = parseFloat(shutterSizeVal) / 2;
+
+            const ffdShape = new THREE.Shape();
+            ffdShape.moveTo(-ffdWidth/2, -ffdHeight/2);
+            ffdShape.lineTo(ffdWidth/2, -ffdHeight/2);
+            ffdShape.lineTo(ffdWidth/2, ffdHeight/2);
+            ffdShape.lineTo(-ffdWidth/2, ffdHeight/2);
+            ffdShape.lineTo(-ffdWidth/2, -ffdHeight/2);
+
+            const holePath = new THREE.Path();
+            holePath.absarc(0, 0, holeRadius, 0, Math.PI * 2, false);
+            ffdShape.holes.push(holePath);
+
+            const ffdGeo = new THREE.ShapeGeometry(ffdShape);
+            const ffdMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, side: THREE.DoubleSide, transparent: true, opacity: 0.25 });
+            meshes.ffdPlane = new THREE.Mesh(ffdGeo, ffdMat);
+            meshes.ffdPlane.position.z = ffdNullZ;
+            
+            const ffdEdges = new THREE.EdgesGeometry(ffdGeo);
+            const ffdLine = new THREE.LineSegments(ffdEdges, new THREE.LineBasicMaterial({ color: 0x00aaff }));
+            meshes.ffdPlane.add(ffdLine);
+            objGroup.add(meshes.ffdPlane);
+
+            // 3. Ringe (Wände simulieren mit großen Outer-Radii)
+            createRing('helicoid', helicoidZ, apWidth, apWidth + 40, 0xff3333);
+            createRing('flange', flangeZ, secondApWidth, secondApWidth + 40, 0xff8c00);
+
+            // 4. Linse & Emission Aperture
+            if (meshes.lens) objGroup.remove(meshes.lens);
+            const lensGeo = new THREE.CircleGeometry(physicalRadius, 32);
+            const lensMat = new THREE.MeshBasicMaterial({ color: 0x00d2ff, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+            meshes.lens = new THREE.Mesh(lensGeo, lensMat);
+            meshes.lens.position.z = lensZ;
+            
+            const irisGeo = new THREE.CircleGeometry(emissionRadius, 32);
+            const irisMat = new THREE.MeshBasicMaterial({ color: 0xffcc00, side: THREE.DoubleSide });
+            const irisMesh = new THREE.Mesh(irisGeo, irisMat);
+            irisMesh.position.z = 0.1;
+            meshes.lens.add(irisMesh);
+            objGroup.add(meshes.lens);
+
+            // 5. Lichtkegel (Gesplittet in 100% Kern und Halbschatten)
+            if (meshes.light) { objGroup.remove(meshes.light); meshes.light.geometry.dispose(); meshes.light.material.dispose(); }
+            if (meshes.lightOuter) { objGroup.remove(meshes.lightOuter); meshes.lightOuter.geometry.dispose(); meshes.lightOuter.material.dispose(); }
+            
+            // Kernschatten-Kegel (100% Licht)
+            const coneGeoInner = new THREE.CylinderGeometry(rInner, emissionRadius, totalDistance, 32, 1, true);
+            const coneMatInner = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
+            meshes.light = new THREE.Mesh(coneGeoInner, coneMatInner);
+            meshes.light.rotation.x = Math.PI / 2;
+            meshes.light.position.z = lensZ + (totalDistance / 2);
+            objGroup.add(meshes.light);
+
+            // Halbschatten-Kegel (Vignettierung)
+            if (rOuter > rInner && unvignettedRadius !== Infinity) {
+                const coneGeoOuter = new THREE.CylinderGeometry(rOuter, emissionRadius, totalDistance, 32, 1, true);
+                const coneMatOuter = new THREE.MeshBasicMaterial({ color: 0xffaaaa, transparent: true, opacity: 0.08, side: THREE.DoubleSide });
+                meshes.lightOuter = new THREE.Mesh(coneGeoOuter, coneMatOuter);
+                meshes.lightOuter.rotation.x = Math.PI / 2;
+                meshes.lightOuter.position.z = lensZ + (totalDistance / 2);
+                objGroup.add(meshes.lightOuter);
+            }
+
+
+            // --- HTML STATUS BOX UPDATES ---
             const statusBox = document.getElementById('statusBox');
             let realDist = (totalDistance).toFixed(1);
             let extensionInfo = bellowsExtension > 0 ? `<br>• Bellows Extension: +${bellowsExtension.toFixed(1)} mm` : '';
@@ -624,14 +617,14 @@
             let collisionWarning = "";
             if (rearDiameter > apWidth || rearDiameter > secondApWidth) {
                 hasMechanicalCollision = true;
-                collisionWarning = `<div style="background:#fce8e6; border:1px solid #c5221f; color:#c5221f; padding:8px; margin-bottom:10px; border-radius:4px;"><b>⚠️ MECHANISCHE KOLLISION:</b> Dein Tubus (${rearDiameter}mm) passt nicht durch die Öffnung!</div>`;
+                collisionWarning = `<div style="background:#fce8e6; border:1px solid #c5221f; color:#c5221f; padding:8px; margin-bottom:10px; border-radius:4px;"><b>⚠️ MECHANISCHE KOLLISION:</b> Dein Tubus (${rearDiameter}mm) passt nicht durch die Helicoid-Öffnung!</div>`;
             } else {
-                collisionWarning = `<div style="color:#137333; margin-bottom:10px;">✓ Physischer Fit: Tubus (${rearDiameter}mm) passt.</div>`;
+                collisionWarning = `<div style="color:#137333; margin-bottom:10px;">✓ Physischer Fit: Tubus (${rearDiameter}mm) passt durch Helicoid/Flange.</div>`;
             }
 
             const formatInfo = `• Required Image Circle: <b>${filmSize.toFixed(1)} mm</b><br>
-                                • Actual Projected Image Circle (100% Light): <b>${projectedDiameter.toFixed(1)} mm</b><br>
-                                • Total Light Circle (Max Limit): <b>${absoluteMaxDiameter.toFixed(1)} mm</b><br><br>`;
+                                • Actual 100% Light Circle: <b>${projectedDiameter.toFixed(1)} mm</b><br>
+                                • Limit of Penumbra (0% Light limit): <b>${absoluteMaxDiameter.toFixed(1)} mm</b><br><br>`;
 
             const vignetteMetricsStr = `<br><hr style="border-top:1px dashed rgba(0,0,0,0.1)">
                                         • Mechanical Vignetting: -${mechanicalEvLoss === Infinity ? "∞" : mechanicalEvLoss.toFixed(2)} EV<br>
@@ -670,42 +663,65 @@
             }
         }
 
+        // --- OPTIMIERUNGS-FUNKTION (Original) ---
+        function calculateProjectedCircle(ffd, focalLength, rearDiameter, maxAperture, lensOffset, fStop, focusInput, filmSize, distOF, apWidth, distSecondOF, secondApWidth) {
+            let g = focusInput * 1000;
+            let b = (focusInput >= 10.0) ? focalLength : (g * focalLength) / (g - focalLength);
+            const bellowsExtension = b - focalLength;
+            const lensZ = -(ffd + bellowsExtension) + lensOffset;
+            const physicalRadius = rearDiameter / 2;
+            const emissionRadius = physicalRadius * (maxAperture / fStop);
+            const helicoidZ = -distOF;
+            const flangeZ = -distSecondOF;
+            const totalDistance = Math.abs(lensZ);
+            
+            const progressHelicoid = totalDistance > 0 ? (helicoidZ - lensZ) / totalDistance : -1;
+            const progressFlange = totalDistance > 0 ? (flangeZ - lensZ) / totalDistance : -1;
+
+            let unvignettedRadius = Infinity;
+            if (progressHelicoid > 0 && progressHelicoid < 1) {
+                let rHel = apWidth / 2;
+                let unvHel = (rHel - emissionRadius * (1 - progressHelicoid)) / progressHelicoid;
+                if (unvHel < unvignettedRadius) unvignettedRadius = Math.max(0, unvHel);
+            }
+            if (progressFlange > 0 && progressFlange < 1) {
+                let rFla = secondApWidth / 2;
+                let unvFla = (rFla - emissionRadius * (1 - progressFlange)) / progressFlange;
+                if (unvFla < unvignettedRadius) unvignettedRadius = Math.max(0, unvFla);
+            }
+
+            let projDiam = unvignettedRadius === Infinity ? filmSize : unvignettedRadius * 2;
+            if (projDiam > filmSize - 0.5 && projDiam < filmSize + 1.0) projDiam = filmSize;
+            return projDiam;
+        }
+
         function optimizeFlange() {
             const ffd = parseFloat(document.getElementById('ffd').value) || 101;
             const focalLength = parseFloat(document.getElementById('lensFocal').value) || 105;
             const maxAperture = parseFloat(document.getElementById('maxAperture').value) || 4.5;
-            
-            // Holt die aktuell eingestellte Arbeitsblende und prüft den Preview-Haken
             const selectfStop = parseFloat(document.getElementById('aperture').value) || maxAperture;
             const previewMaxAp = document.getElementById('previewMaxAp').checked;
             const activeAperture = previewMaxAp ? maxAperture : selectfStop;
-            
             const filmSize = parseFloat(document.getElementById('filmSize').value);
             const focusInput = parseFloat(document.getElementById('focusDistance').value);
-            
             let rawOffset = parseFloat(document.getElementById('lensOffset').value);
             const lensOffset = isNaN(rawOffset) ? 3 : rawOffset;
-            
             const rearDiameter = parseFloat(document.getElementById('rearDiameter').value) || Math.round(focalLength / maxAperture);
-
             const apWidth = parseFloat(document.getElementById('apWidth').value) || 61.0;
             const secondApWidth = parseFloat(document.getElementById('secondApWidth').value) || 64.0;
-            
             const currentDistOF = parseFloat(document.getElementById('distOF').value) || 41.5;
             const currentDistSecondOF = parseFloat(document.getElementById('distSecondOF').value) || 39.0;
+            
             const fixedComponentGap = currentDistOF - currentDistSecondOF; 
-
             let bestDistSecondOF = currentDistSecondOF;
             let foundSolution = false;
 
             for (let testFlange = 1.0; testFlange <= 200.0; testFlange += 0.1) {
                 let testHelicoid = testFlange + fixedComponentGap;
-                
                 let resultCircle = calculateProjectedCircle(
                     ffd, focalLength, rearDiameter, maxAperture, lensOffset, activeAperture, 
                     focusInput, filmSize, testHelicoid, apWidth, testFlange, secondApWidth
                 );
-
                 if (resultCircle >= filmSize) {
                     bestDistSecondOF = testFlange;
                     foundSolution = true;
@@ -723,10 +739,26 @@
             }
         }
 
-        // Initialization
-        resetCentering();
+        // --- EVENT LISTENERS ---
+        document.getElementById('lensFocal').addEventListener('input', autoCalcRearDiameter);
+        document.getElementById('maxAperture').addEventListener('change', autoCalcRearDiameter);
+
+        document.getElementById('maxAperture').addEventListener('change', () => {
+            updateWorkingApertureDropdown(true); 
+            updateURL();
+            draw();
+        });
+
+        const inputs = ['ffd', 'shutterSize', 'lensFocal', 'rearDiameter', 'lensOffset', 'aperture', 'previewMaxAp', 'focusDistance', 'coc', 'filmSize', 'distOF', 'apWidth', 'distSecondOF', 'secondApWidth'];
+        inputs.forEach(id => {
+            document.getElementById(id).addEventListener('input', () => { updateURL(); draw(); });
+            document.getElementById(id).addEventListener('change', () => { updateURL(); draw(); });
+        });
+
+        // --- BOOT ---
+        init3D();
         loadSettingsFromURL();
-        updateURL(); // Ensure URL immediately reflects the applied settings
+        updateURL();
         draw();
     </script>
 </body>
