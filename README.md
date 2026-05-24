@@ -19,11 +19,11 @@ Building "Frankenstein" cameras (combining vintage lenses with custom 3D-printed
 ## ✨ Key Features
 
 * **Real-time 3D Visualization:** See exactly how the light cone interacts with the lens barrel and helicoid using the built-in Three.js engine.
-* **Mechanical Collision Detection:** Warns you if your specific lens's rear element (e.g., oversized elements like the Super Angulon 90mm f/8) won't fit through standard helicoids (e.g., 61mm inner diameter).
+* **Mechanical Collision Detection:** Warns you if your specific lens's rear element.
 * **Advanced Vignetting Analysis:** * Calculates and visually renders **mechanical vignetting** on the film plane.
   * Calculates natural lens falloff (Cos⁴ law).
   * Shows exact coverage percentages for formats like 6x6, 6x7, 6x8, 6x9, and 4x5".
-* **Independent Lens Offset:** Define the physical position of the rear element independently from the Flange Focal Distance (FFD), crucial for symmetrical wide-angle lens designs.
+* **Independent Lens Offset:** Define the physical position of the rear element independently from the Flange Focal Distance (FFD).
 * **Optical Math Engine:** Automatically computes Depth of Field (DoF), Circle of Confusion (CoC), and diffraction limits based on focus distance and working aperture.
 * **URL State Saving:** All parameters are saved in the URL, making it easy to bookmark or share specific camera builds with the community.
 
