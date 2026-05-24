@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Frankenstein Camera Simulator 3D - by Dragan Bojovic</title>
-    <!-- Three.js Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
@@ -55,8 +54,7 @@
             <h2>Frankenstein Simulator 3D</h2>
             
             <div id="viewport">
-                <!-- Text-Overlays wurden entfernt -->
-            </div>
+                </div>
 
             <div id="statusBox" class="status-box status-ok">
                 Optical Status: Calculating...
@@ -585,27 +583,17 @@
             meshes.lens.add(irisMesh);
             objGroup.add(meshes.lens);
 
-            // 5. Lichtkegel (Gesplittet in 100% Kern und Halbschatten)
+            // 5. Lichtkegel (Äußerer Halbschatten-Kegel entfernt für visuelle Klarheit)
             if (meshes.light) { objGroup.remove(meshes.light); meshes.light.geometry.dispose(); meshes.light.material.dispose(); }
-            if (meshes.lightOuter) { objGroup.remove(meshes.lightOuter); meshes.lightOuter.geometry.dispose(); meshes.lightOuter.material.dispose(); }
+            if (meshes.lightOuter) { objGroup.remove(meshes.lightOuter); meshes.lightOuter.geometry.dispose(); meshes.lightOuter.material.dispose(); meshes.lightOuter = null; }
             
-            // Kernschatten-Kegel (100% Licht)
+            // Nur noch der Kernschatten-Kegel (100% Licht) wird in 3D gezeichnet
             const coneGeoInner = new THREE.CylinderGeometry(rInner, emissionRadius, totalDistance, 32, 1, true);
             const coneMatInner = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
             meshes.light = new THREE.Mesh(coneGeoInner, coneMatInner);
             meshes.light.rotation.x = Math.PI / 2;
             meshes.light.position.z = lensZ + (totalDistance / 2);
             objGroup.add(meshes.light);
-
-            // Halbschatten-Kegel (Vignettierung)
-            if (rOuter > rInner && unvignettedRadius !== Infinity) {
-                const coneGeoOuter = new THREE.CylinderGeometry(rOuter, emissionRadius, totalDistance, 32, 1, true);
-                const coneMatOuter = new THREE.MeshBasicMaterial({ color: 0xffaaaa, transparent: true, opacity: 0.08, side: THREE.DoubleSide });
-                meshes.lightOuter = new THREE.Mesh(coneGeoOuter, coneMatOuter);
-                meshes.lightOuter.rotation.x = Math.PI / 2;
-                meshes.lightOuter.position.z = lensZ + (totalDistance / 2);
-                objGroup.add(meshes.lightOuter);
-            }
 
 
             // --- HTML STATUS BOX UPDATES ---
