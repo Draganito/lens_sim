@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 10px; background-color: #f4f4f4; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 10px; background-color: #f4f4f4; color: #333; }
         .container { display: flex; flex-direction: column; gap: 20px; max-width: 1200px; margin: 0 auto; }
         
         @media (min-width: 768px) {
@@ -19,6 +19,15 @@
         .controls { flex: 1; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .canvas-container { flex: 2; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
         
+        /* Documentation Section Styles */
+        .documentation { max-width: 1200px; margin: 20px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); line-height: 1.6; }
+        .documentation h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        .documentation h3 { color: #0056b3; margin-top: 25px; margin-bottom: 10px; font-size: 1.1em; }
+        .documentation ul { padding-left: 20px; }
+        .documentation li { margin-bottom: 12px; }
+        .documentation strong.impact { color: #c5221f; }
+        .documentation strong.def { color: #137333; }
+
         label { display: block; margin: 12px 0 4px 0; font-weight: bold; font-size: 0.95em; }
         input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
         
@@ -159,6 +168,34 @@
             <button type="button" class="btn-optimize" onclick="optimizeFlange()">Optimize Flange & Helicoid for 100% Light</button>
             <button type="button" class="btn-reset" onclick="resetToDefaults()">Reset to Default Settings</button>
         </div>
+    </div>
+
+    <div class="documentation">
+        <h2>Parameter Guide & Physics Manual</h2>
+        <p>This simulator visually and mathematically calculates the complex interactions between vintage large/medium format lenses and custom 3D-printed or CNC-machined camera bodies. Below is a guide to understanding the parameters and their physical impact.</p>
+
+        <h3>1. Lens & Body Geometry</h3>
+        <ul>
+            <li><strong class="def">Flange Focal Distance (FFD):</strong> The distance from the lens board to the film plane at infinity focus. <br><strong class="impact">Impact:</strong> Defines the baseline for your focusing mechanics. If your chosen body FFD is too long for the lens, you won't be able to achieve infinity focus.</li>
+            <li><strong class="def">Lens Board / Shutter Hole:</strong> The standard mounting hole size (e.g., Compur #0, #1) required on your lens board. <br><strong class="impact">Impact:</strong> This is purely structural and symbolic in the 3D view to help you visualize the lens board. It defines the mounting thread requirement but does not cause optical vignetting.</li>
+            <li><strong class="def">Rear Lens Offset to FFD:</strong> The distance the rear lens element protrudes into the camera body past the lens board (FFD plane). <br><strong class="impact">Impact:</strong> Standard for almost all medium and large format lenses mounted in leaf shutters, as the rear cell sits behind the shutter plane. This defines the true physical starting point of the light cone and is critical for checking if the rear barrel hits internal camera walls.</li>
+            <li><strong class="def">Physical Rear Lens Diameter:</strong> The outer physical width of the rear lens barrel. <br><strong class="impact">Impact:</strong> Critical for collision detection. If this is wider than your helicoid/flange openings, the lens simply will not fit into the camera body.</li>
+        </ul>
+
+        <h3>2. Optics & Aperture</h3>
+        <ul>
+            <li><strong class="def">Lens Focal Length:</strong> The optical focal length of your lens. <br><strong class="impact">Impact:</strong> Drives magnification, bellows extension calculations, and Depth of Field limits.</li>
+            <li><strong class="def">Working Aperture:</strong> The f-stop you intend to shoot at. <br><strong class="impact">Impact:</strong> Stopping down narrows the light cone. This increases Depth of Field (DoF), increases Film Plane Tolerance (Depth of Focus), and reduces mechanical vignetting. However, stopping down too much lowers maximum resolution due to diffraction.</li>
+            <li><strong class="def">Ground Glass View:</strong> A toggle to simulate the camera wide-open. <br><strong class="impact">Impact:</strong> Shows the light falloff and DoF you will see <em>while composing</em> on the ground glass, even if your final shot will be stopped down.</li>
+        </ul>
+
+        <h3>3. Focus & Mechanics</h3>
+        <ul>
+            <li><strong class="def">Focus Distance:</strong> How far away your subject is. <br><strong class="impact">Impact:</strong> Focusing closer requires moving the lens away from the film (bellows extension). This stretches the light cone, dramatically shrinking your Depth of Field (sharpness on the subject), but magically <em>increasing</em> your Depth of Focus (tolerance on the film plane) due to the narrower effective aperture.</li>
+            <li><strong class="def">Circle of Confusion (CoC):</strong> The maximum blur size considered "sharp" for your format. <br><strong class="impact">Impact:</strong> Dictates how strict the DoF calculations are. Smaller values mean stricter sharpness requirements.</li>
+            <li><strong class="def">Registration Error (Film vs. Mattscheibe):</strong> The mechanical mismatch (in mm) between your ground glass and the actual film plane position in your custom back adapter. <br><strong class="impact">Impact:</strong> Calculates how much actual resolution (lp/mm) you lose due to manufacturing inaccuracies. A 0.5mm error at wide apertures will result in critical blur. This impact is highest at infinity focus!</li>
+            <li><strong class="def">Helicoid / Flange Mechanics (Distances & Diameters):</strong> The internal walls and tubes of your custom camera body. <br><strong class="impact">Impact:</strong> Defines the mechanical "tunnel" the light must travel through. If these are too narrow or too long, they will clip the light cone, resulting in heavy mechanical vignetting. Use the <em>Optimize</em> button to auto-calculate the perfect distances!</li>
+        </ul>
     </div>
 
     <script>
@@ -415,14 +452,10 @@
             let depthOfFocusTotal = 2 * effectiveAperture * coc;
             let depthOfFocusTolerance = depthOfFocusTotal / 2;
 
-            // --- NEW: CALCULATION OF RESOLUTION LOSS DUE TO REGISTRATION ERROR ---
-            // 1. Geometric blur circle diameter caused by focus offset
+            // --- CALCULATION OF RESOLUTION LOSS DUE TO REGISTRATION ERROR ---
             let blurDefocus = regError / effectiveAperture;
-            // 2. Blur circle equivalent of the diffraction limit
             let blurDiffraction = 1 / lpmm;
-            // 3. Combine blurs using Root-Sum-Square (RSS) method
             let totalBlur = Math.sqrt(Math.pow(blurDefocus, 2) + Math.pow(blurDiffraction, 2));
-            // 4. Remaining effective resolution
             let remainingLpmm = 1 / totalBlur;
 
 
