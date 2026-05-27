@@ -211,6 +211,15 @@
             6.3, 6.8, 7.2, 8, 9, 9.5, 11, 12.5, 16, 18, 22, 25, 32, 36, 45, 50, 64, 68, 71, 88
         ];
 
+        // --- HILFSFUNKTION FÜR 2D-FLÄCHENBERECHNUNG (NEU) ---
+        // Berechnet die exakte Fläche eines Kreises oberhalb einer horizontalen Linie y
+        function getCircularCapArea(radius, y) {
+            // Begrenzung strikt auf den Kreisradius, um NaN-Fehler zu vermeiden
+            let h = Math.max(-radius, Math.min(radius, y));
+            // Geometrische Formel für ein Kreissegment
+            return Math.pow(radius, 2) * Math.acos(h / radius) - h * Math.sqrt(Math.max(0, Math.pow(radius, 2) - Math.pow(h, 2)));
+        }
+
         // --- 3D ENGINE INITIALIZATION ---
         let scene, camera, renderer, controls;
         let objGroup;
@@ -521,12 +530,19 @@
             let effectiveTop = Math.min(irisTop, helTopFromCorner, flaTopFromCorner);
             let effectiveBottom = Math.max(irisBottom, helBottomFromCorner, flaBottomFromCorner);
 
-            let fullIrisWindow = emissionRadius * 2;
-            let effectiveWindow = effectiveTop - effectiveBottom;
-            if (effectiveWindow < 0) effectiveWindow = 0;
+            // --- 2D FLÄCHENBERECHNUNG FÜR MECHANISCHEN EV LOSS (NEU) ---
+            let totalArea = Math.PI * Math.pow(emissionRadius, 2);
 
-            let preciseTransmission = effectiveWindow / fullIrisWindow;
+            // Wir berechnen die Kreisfläche oberhalb der unteren Schnittkante
+            // und ziehen davon die Fläche oberhalb der oberen Schnittkante ab.
+            // Was übrig bleibt, ist exakt die Fläche in der Mitte.
+            let visibleArea = getCircularCapArea(emissionRadius, effectiveBottom) - getCircularCapArea(emissionRadius, effectiveTop);
+
+            if (visibleArea < 0) visibleArea = 0;
+
+            let preciseTransmission = totalArea > 0 ? visibleArea / totalArea : 0;
             let mechanicalEvLoss = preciseTransmission > 0 ? -Math.log2(preciseTransmission) : Infinity;
+            // -----------------------------------------------------------
 
             // NATURAL OPTICAL VIGNETTING (COS⁴ LAW)
             let cornerAngleRad = Math.atan((filmSize / 2) / totalDistance);
