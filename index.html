@@ -458,6 +458,9 @@
             let totalBlur = Math.sqrt(Math.pow(blurDefocus, 2) + Math.pow(blurDiffraction, 2));
             let remainingLpmm = 1 / totalBlur;
 
+            // --- MTF50 BERECHNUNGEN ---
+            let mtf50_perfect = lpmm * 0.404;
+            let mtf50_actual = remainingLpmm * 0.404;
 
             // --- VIGNETTING MATH (PENUMBRA / UMBRA) ---
             const progressHelicoid = totalDistance > 0 ? (helicoidZ - lensZ) / totalDistance : -1;
@@ -668,11 +671,11 @@
             // Format Resolution Output Based on Error Severity
             let resolutionOutput = `<b>~${remainingLpmm.toFixed(0)} lp/mm</b>`;
             if (remainingLpmm < 30) {
-                resolutionOutput = `<span style="color:#c5221f;"><b>~${remainingLpmm.toFixed(0)} lp/mm (CRITICAL BLUR)</b></span>`;
+                resolutionOutput = `<span style="color:#c5221f;"><b>~${remainingLpmm.toFixed(0)} lp/mm | MTF50: ~${mtf50_actual.toFixed(0)} lp/mm (CRITICAL BLUR)</b></span>`;
             } else if (remainingLpmm < 45) {
-                resolutionOutput = `<span style="color:#b06000;"><b>~${remainingLpmm.toFixed(0)} lp/mm (Soft)</b></span>`;
+                resolutionOutput = `<span style="color:#b06000;"><b>~${remainingLpmm.toFixed(0)} lp/mm | MTF50: ~${mtf50_actual.toFixed(0)} lp/mm (Soft)</b></span>`;
             } else {
-                resolutionOutput = `<span style="color:#137333;"><b>~${remainingLpmm.toFixed(0)} lp/mm (Sharp)</b></span>`;
+                resolutionOutput = `<span style="color:#137333;"><b>~${remainingLpmm.toFixed(0)} lp/mm | MTF50: ~${mtf50_actual.toFixed(0)} lp/mm (Sharp)</b></span>`;
             }
 
             const opticsMetricsStr = `<br><hr style="border-top:1px dashed rgba(0,0,0,0.1)">
@@ -686,7 +689,7 @@
                                       • Total Spread: ${depthOfFocusTotal.toFixed(3)} mm<br><br>
                                       
                                       <b>Diffraction & Registration Error Resolution @ f/${selectfStop}:</b><br>
-                                      • Perfect Focus Max Resolution: ~${lpmm.toFixed(0)} lp/mm (Diffraction Limit)<br>
+                                      • Perfect Focus Resolution: ~${lpmm.toFixed(0)} lp/mm (0% MTF) | <b>MTF50: ~${mtf50_perfect.toFixed(0)} lp/mm</b><br>
                                       • Blur from ${regError.toFixed(3)}mm Error: Ø ${blurDefocus.toFixed(3)} mm<br>
                                       • <b>Actual Resolution (incl. Error): ${resolutionOutput}</b>`;
 
