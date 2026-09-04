@@ -12,15 +12,16 @@ https://draganito.github.io/lens_sim/
 
 ## 📖 About the Project
 
-This simulator was originally developed as an engineering tool during the creation of the **miluka** – a custom medium-format camera utilizing M65 helicoids and Graflok 23 standard backs (compatible with Mamiya RB67 6x8, 6x9, or sheet film). 
+This simulator was originally developed as an engineering tool during the creation of the **[miluka (LF Concept Camera)](https://github.com/Draganito/miluka)** – a custom CNC-milled medium-format camera utilizing M65 helicoids and Graflok 23 standard backs (compatible with Mamiya RB67 6x8, 6x9, or sheet film). The produced camera's CAD (FreeCAD sources + production STEP set) is published in that repository.
 
 Building "Frankenstein" cameras (combining vintage lenses with custom 3D-printed/CNC bodies) often involves heavy trial-and-error, especially regarding mechanical clearance, flange focal distance (FFD), and unexpected vignetting. This tool solves those issues by simulating the optical and physical realities directly in your browser.
 
 ## ✨ Key Features
 
 * **Real-time 3D Visualization:** See exactly how the light cone interacts with the lens barrel and helicoid using the built-in Three.js engine.
-* **Mechanical Collision Detection:** Warns you if your specific lens's rear element.
-* **Advanced Vignetting Analysis:** * Calculates and visually renders **mechanical vignetting** on the film plane.
+* **Mechanical Collision Detection:** Warns you if your specific lens's rear element collides with the helicoid bore or body.
+* **Advanced Vignetting Analysis:**
+  * Calculates and visually renders **mechanical vignetting** on the film plane.
   * Calculates natural lens falloff (Cos⁴ law).
   * Shows exact coverage percentages for formats like 6x6, 6x7, 6x8, 6x9, and 4x5".
 * **Independent Lens Offset:** Define the physical position of the rear element independently from the Flange Focal Distance (FFD).
