@@ -2,7 +2,7 @@
 
 **A web-based 3D simulator for calculating and visualizing custom DIY medium and large format cameras.**
 
-Created by **Dragan Bojovic** License: **GNU General Public License v3.0 (GPLv3)**
+Created by **Dragan Bojovic** · License: **GNU General Public License v3.0 (GPLv3)**
 
 https://draganito.github.io/lens_sim/
 
